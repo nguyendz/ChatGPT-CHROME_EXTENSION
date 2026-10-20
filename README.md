@@ -1,153 +1,63 @@
-> [!TIP]
-> **Open to contributions.** If you'd like to improve the extension, fix a bug, or add a feature, feel free to open a Pull Request. Even small improvements are welcome. If you find the project useful, consider giving it a ⭐ to help others discover it, or sponsor it.
-> </br>
-> <a href="https://github.com/sponsors/FredySandoval">
-> <img src="https://img.shields.io/badge/Sponsor-ChatGPT%20Backup-ea4aaa?style=for-the-badge&logo=githubsponsors" alt="Sponsor on GitHub Sponsors">
-> </a>
-# ChatGPT Backup Tool for Chrome
+# ChatGPT Local Sync
 
-<p align="center">
-  <img width="1400" height="560" alt="Marquee promo 1400x560 Canvas" src="https://github.com/user-attachments/assets/6240bf0d-39af-4a2b-a349-9f38e76df969" />
-</p>
+A Chrome extension for syncing saved ChatGPT conversations to a local SQLite
+database through a Chrome Native Messaging host.
 
+## Current behavior
 
+- **Sync latest 10 chats (validation)** is the default scope. The extension
+  scans every conversation-list page, ranks parseable `update_time` values, and
+  fetches details only for the 10 most recently updated chats. Choose **All
+  chats** to sync the full list. Missing or mixed timestamps stop latest-10
+  mode rather than guessing the order.
+- Every request to ChatGPT is serialized and separated from the preceding
+  request by at least two seconds after its response is read.
+- Sync results report new chats and newly added message IDs, along with
+  updated, unchanged, and failed chat counts.
+- **Stop** finishes the current request/upsert and preserves conversations
+  already committed. A later run starts the list scan again from the beginning.
+- **Open** expands the local-sync details, including **Sync this chat**,
+  connection status, and diagnostics.
+- A safe-URL-only change refreshes conversation metadata without rewriting
+  message rows; an identical payload is a no-op.
+- ChatGPT credentials stay in the extension and are not sent to the local host.
+- Sync is manual. Project/archive reconciliation and automatic sync are not
+  included yet.
+- File downloads and conversation exports are not part of this extension.
 
-### [chromewebstore.google.com/chatgpt-backup](https://chrome.google.com/webstore/detail/chatgpt-backup/majboohgjfdnegkhadaialohhlimolcc)
+For local setup, host registration, verification, and removal, see the
+[local development waves](./docs/local-sync-development-waves.md#run-wave-1-locally).
+The [Wave 3 plan](./docs/local-sync-wave-3-plan.md) records all-chat behavior
+and remaining live acceptance checks.
 
+## Inspect the local database
 
+The read-only CLI can report row counts and recent sync outcomes:
 
-
-**ChatGPT Backup Tool** is a Chrome extension built for users who want a fast, simple, and flexible way to export their ChatGPT data. Whether you need a personal archive, project documentation, research notes, or machine-readable backups, this extension gives you one-click exports in formats that are actually useful.
-
-
-This extension helps you:
-- Back up a **single conversation** or **your full chat history**
-- Export in **Markdown / MDX-ready Markdown** for readable notes and documentation
-- Export in **JSON** for automation, scripting, and data processing
-- Save **all markdown chats as a ZIP** for easy archiving
-- Export **raw JSON** when you need the original structured data
-- Preserve **rich content rendering** more accurately in exports
-- Include **file citation rendering support** in exported content
-- Back up the **current ChatGPT project** when working inside project-based chats
-- Track download/export progress directly from the popup
-- Stop long-running downloads when needed
-- Customize labels and markdown/frontmatter behavior from the options page
-
-## Main features
-
-### Export the current chat as PDF
-Choose **Current Chat → PDF → Preview conversation**. A separate tab opens an HTML
-preview. Include or exclude messages, restore them with **Select all**, or hide
-excluded messages to review your selection. Selections never change the original conversation.
-
-Click **Save as PDF** to open Chrome’s print dialog, then choose **Save as PDF**
-as the destination. Turn off **Headers and footers** to omit Chrome’s date, URL,
-and page numbers. Canceling the dialog leaves your selection intact.
-
-Chrome prints the preview’s HTML locally, with selectable text, links, tables,
-monospaced code, and embedded images. Print styles hide controls and excluded
-messages and adapt the document to paper with margins and page breaks. Your saved
-User/Assistant labels are respected, including live settings changes. Fonts depend
-on those available on your system. No server or additional extension permission is needed.
-
-Equations remain source text. Linked web images keep their original alt text or URL
-as links, and non-image attachments are listed by name. Unavailable or oversized
-images are reported in the preview rather than adding notes to the exported document.
-PDF export uses the conversation’s saved active branch. Image limits are 15 MB per
-image and 24 MB total. Bulk PDF export is not supported.
-
-### Export the current chat
-Quickly download the conversation you are currently viewing in:
-- **JSON**
-- **Markdown**
-
-Perfect for saving important prompts, answers, study sessions, code reviews, brainstorming sessions, and documentation.
-
-### Export all chats
-Need everything? Export your full history with just a few clicks:
-- **All chats as one JSON file**
-- **All chats as Markdown files inside a ZIP archive**
-
-Ideal for complete backups, audits, migration, or personal archives.
-
-### Export the current project
-If you use ChatGPT Projects, the extension can also help you export project-related conversations.
-
-This includes:
-- **Current project backup flow**
-- **Project-aware actions in the popup**
-- **Project conversation discovery** for project-specific exports
-
-### Raw JSON export
-For power users, developers, and automation workflows, raw JSON export gives you access to structured conversation data for:
-- custom scripts
-- data pipelines
-- analytics
-- migration workflows
-- research tooling
-
-### Better Markdown, MDX, and frontmatter output
-Markdown export is designed to be practical, readable, and ready for modern content workflows.
-
-Recent improvements include:
-- better default markdown labels
-- improved sizing and layout behavior
-- richer content rendering
-- frontmatter-related improvements
-- customizable USER / ASSISTANT label sections
-- support for plain text, markdown, or HTML label content
-- cleaner output for users who want to move conversations into **MDX-based docs, blogs, notes, or knowledge bases**
-
-If you publish content with tools like Astro, Next.js, Docusaurus, Contentlayer, or any markdown-based documentation site, frontmatter support makes exported chats easier to organize and reuse.
-
-That means you can take a ChatGPT conversation and turn it into something closer to publishable content, with metadata and structure that fit modern markdown workflows.
-
-### File citation rendering support
-Conversations that reference uploaded files or file-based content are handled better with improved citation rendering support in exports.
-
-### Progress updates and control
-The popup keeps you informed while exports are running.
-
-You get:
-- progress/log feedback in the extension UI
-- clearer popup actions and layout
-- support for stopping downloads when necessary
-
-### Easy configuration
-The options page lets you tailor exports to your workflow.
-
-Depending on your preferred setup, you can configure items such as:
-- start/end offsets
-- markdown labels
-- frontmatter-related settings
-- USER / ASSISTANT section formatting
-- HTML/markdown/plain-text display preferences
-- formatting choices that make exports easier to reuse in markdown/MDX publishing workflows
-
-## Built for real use
-
-This extension is useful for:
-- **students** saving study sessions
-- **developers** archiving debugging conversations
-- **researchers** collecting prompt/output datasets
-- **writers** preserving drafts and ideation threads
-- **teams** keeping project conversations documented
-- **power users** creating structured data exports for automation
-
-
-
-```txt
-# Own your conversations
-# Your prompts, ideas, research, and work sessions are valuable.
+```powershell
+node .\local-app\scripts\db-query.mjs counts
+node .\local-app\scripts\db-query.mjs runs
 ```
 
-### PDF development checks
+`list` shows compact conversation IDs; `show <id>` displays a selected
+conversation. These commands open the database read-only.
 
-Run `node tests/pdf-export.test.mjs` with Node 22.18+ to check branch selection
-and shared export behavior. Run `pnpm compile` and `pnpm build` before release.
+## API diagnostics
 
-Run `node tests/pdf-preview.browser.mjs` after building to exercise selection,
-settings updates, the print action, and Chromium’s actual PDF output in an isolated
-profile with synthetic data. The test stubs the native dialog and uses CDP only in
-the test to inspect the printed result; the extension itself uses `window.print()`.
-Requires Chromium and Poppler; set `CHROMIUM_PATH` if Chromium is installed elsewhere.
+To investigate ChatGPT API behavior, open a signed-in ChatGPT tab, choose
+**Open** in the extension, expand **Developer diagnostics**, and select
+**Probe ChatGPT API**. It makes bounded read-only requests and records a
+sanitized report in
+`%LOCALAPPDATA%\ChatGPTBackup\logs\host.log`. Review only the `API_PROBE`
+entries when sharing probe results. Failed sync runs add a sanitized
+`SYNC_RUN_FAILURE` category summary to the same log; it excludes chat IDs and
+failure text.
+
+## Development checks
+
+```powershell
+corepack pnpm compile
+corepack pnpm test:local-sync
+node --test .\tests\messaging-bugs.test.mjs
+corepack pnpm build
+```

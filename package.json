@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-backup-wxt",
-  "description": "Backup your OpenAI ChatGPT history in either JSON or Markdown format",
+  "description": "Sync your open ChatGPT conversation to a local SQLite database",
   "private": true,
   "version": "0.1.5",
   "type": "module",
@@ -12,14 +12,13 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "test:local-sync": "node --test tests/local-app/*.test.mjs",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.8.26",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
-    "marked": "^18.0.13",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -31,6 +30,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@types/chrome": "^0.1.42",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",

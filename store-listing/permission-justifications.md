@@ -2,16 +2,15 @@
 
 ## `activeTab`
 
-Used to identify the currently active ChatGPT tab and determine whether the user is viewing a normal conversation or a project conversation. This is needed for user-initiated current-chat and current-project exports.
+Used to identify the currently active saved ChatGPT conversation when the user
+starts a sync.
 
-## `downloads`
+## `nativeMessaging`
 
-Used to save exported JSON, raw JSON, Markdown, and ZIP files locally through Chrome's downloads API.
-
-## `storage`
-
-Used to save user preferences such as export offsets, max chat count, Markdown labels, Markdown/MDX preference, frontmatter template, auto-advance setting, and detected color scheme.
+Used to send the selected conversation to the user's registered local host for
+storage in SQLite.
 
 ## Host permission: `https://chatgpt.com/*`
 
-Used to access ChatGPT pages and ChatGPT API responses needed to export the user's own conversations after the user initiates a backup.
+Used to read the ChatGPT session and conversation data after the user initiates
+a sync, and to run the optional bounded API diagnostic.

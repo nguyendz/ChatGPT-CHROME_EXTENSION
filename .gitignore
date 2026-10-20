@@ -15,6 +15,9 @@ stats.html
 stats-*.json
 .wxt
 web-ext.config.ts
+.local/
+local-app/host/run-host.cmd
+local-app/host/allowed-origin.txt
 
 # Editor directories and files
 .vscode/*

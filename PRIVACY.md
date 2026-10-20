@@ -1,97 +1,48 @@
-# Privacy Policy — ChatGPT Backup
+# Privacy Policy — ChatGPT Local Sync
 
-**ChatGPT Backup** is a Chrome extension designed to help users export and back up their own ChatGPT conversations to local files.
+ChatGPT Local Sync is a Chrome extension that stores the currently open saved
+ChatGPT conversation in a local database managed by the user's Native Messaging
+host.
 
-## What data the extension accesses
+## Data accessed
 
-The extension may access the following data on `https://chatgpt.com/*` only when the user chooses to run an export:
+After the user chooses **Sync this chat**, the extension accesses the active
+ChatGPT conversation URL, the user's ChatGPT session response, and the
+conversation payload (including title, message content, metadata, and branches).
+The optional API diagnostic makes bounded read-only requests and records
+sanitized response-shape summaries; it does not store message content.
 
-- ChatGPT conversation titles and message content
-- ChatGPT conversation metadata needed to create exports
-- Project-related conversation identifiers and project conversation content
-- Page content needed to identify the current chat or current project
-- The active ChatGPT session response needed to request the user's own conversations from ChatGPT
-- User-selected export settings stored in Chrome extension storage
+## Data use and storage
 
-## How the data is used
+The extension sends the selected conversation payload and account scope to the
+user's local Native Messaging host. The host stores the raw payload, normalized
+message rows, and sync-run metadata in SQLite under
+`%LOCALAPPDATA%\ChatGPTBackup`. The extension does not send conversation data
+to the developer or an analytics service.
 
-The extension uses accessed data only to provide its core export functionality, including:
-
-- exporting the current chat
-- exporting all chats
-- exporting project chats
-- generating Markdown, MDX, JSON, raw JSON, or ZIP exports
-- applying user-selected formatting options such as Markdown labels and MDX frontmatter
-- saving extension preferences for future exports
-- showing export progress and cancellation status
-
-## Data storage
-
-The extension stores only user preferences using Chrome extension storage APIs.
-
-Examples of stored settings may include:
-
-- export offsets / maximum chat count
-- Markdown user and assistant label settings
-- Markdown or MDX file extension preference
-- MDX frontmatter template
-- auto-advance preference
-- detected color scheme
-
-Exported conversation files are downloaded directly to the user's device through Chrome's downloads API.
-
-## Authentication/session tokens
-
-The extension may temporarily read the active ChatGPT session access token from ChatGPT's own session endpoint in order to request the user's conversations from ChatGPT on the user's behalf after the user initiates an export.
-
-The extension does **not** persist ChatGPT access tokens in `chrome.storage.sync`, `chrome.storage.local`, or other durable extension storage. Token material is kept only in service-worker memory while needed and may be cleared when a token expires, an export fails with authorization errors, or the service worker is suspended by Chrome.
-
-## Data sharing
-
-This extension does **not** sell user data.
-
-This extension does **not** share, transfer, or transmit ChatGPT conversation data to the developer or third-party analytics services.
-
-This extension does **not** transfer user data to third parties for advertising or unrelated purposes.
-
-This extension does **not** use user data to determine creditworthiness or for lending purposes.
-
-If a user later uploads, shares, opens, or processes exported files in another application, that is outside the extension's control.
-
-## Remote code and analytics
-
-The extension does **not** use remote executable code. All executable code is packaged with the extension.
-
-The extension does **not** include analytics tracking.
+The extension does not persist the ChatGPT access token. It is held in
+service-worker memory only while making ChatGPT requests and is never sent to
+the local host.
 
 ## Network requests
 
-The extension makes requests to `https://chatgpt.com/*` to retrieve the user's own ChatGPT session and conversation data after the user initiates an export.
+The extension makes requests to `https://chatgpt.com/*` to read the current
+session and conversation after a user action. Conversation data is sent only
+over Native Messaging to the user's local host.
 
-## Permissions used
+## Permissions
 
-The extension requests only the permissions needed for its single purpose of exporting ChatGPT conversations:
-
-- `activeTab` — used to identify the currently active ChatGPT tab and determine whether the user is viewing a normal conversation or project conversation.
-- `downloads` — used to save exported JSON, raw JSON, Markdown, MDX, and ZIP files to the user's device.
-- `storage` — used to save user preferences and export settings.
-- host permission for `https://chatgpt.com/*` — used to access ChatGPT pages and ChatGPT API responses needed to export the user's own conversations after the user initiates a backup.
+- `activeTab` — identify the currently active ChatGPT conversation.
+- `nativeMessaging` — send sync data to the locally registered host.
+- `https://chatgpt.com/*` — request the user's session and conversation data.
 
 ## User control
 
-The extension runs export actions only when the user chooses to use it.
-
-Users control:
-
-- when exports are started
-- whether to export the current chat, all chats, or project chats
-- which export format is used
-- what formatting settings are saved in the extension
-- whether to stop a long-running backup and download a partial result
+Sync and API diagnostics run only when started by the user from the extension
+popup. All-chat, project, and automatic sync are not currently available.
+Conversation file downloads and exports are not provided.
 
 ## Contact and support
-
-For questions or support, use the support channel listed on the Chrome Web Store listing or visit:
 
 - GitHub repository: https://github.com/FredySandoval/ChatGPT-CHROME_EXTENSION
 - Support / issues: https://github.com/FredySandoval/ChatGPT-CHROME_EXTENSION/issues

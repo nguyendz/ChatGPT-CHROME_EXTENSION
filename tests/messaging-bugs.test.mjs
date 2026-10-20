@@ -32,34 +32,30 @@ function execute(source, globals) {
 
 const listenerSource = sourceNode('../entrypoints/background.ts', (node, source) =>
   ts.isCallExpression(node) && node.expression.getText(source) === 'chrome.runtime.onMessage.addListener');
-const helperSource = sourceNode('../entrypoints/popup/App.tsx', node =>
-  ts.isFunctionDeclaration(node) && node.name?.text === 'sendMessage');
+const connectListenerSource = sourceNode('../entrypoints/background.ts', (node, source) =>
+  ts.isCallExpression(node) && node.expression.getText(source) === 'chrome.runtime.onConnect.addListener');
+const senderCheckSource = sourceNode('../entrypoints/background.ts', node =>
+  ts.isFunctionDeclaration(node) && node.name?.text === 'isExtensionSender');
 
-function background() {
+function background({ chrome: chromeOverrides = {}, ...globals } = {}) {
   let listener;
-  const writes = [];
-  execute(listenerSource, {
-    chrome: {
-      runtime: { onMessage: { addListener: callback => { listener = callback; } } },
-      storage: { local: { set: async value => { writes.push(value); } } },
+  let connectListener;
+  const chrome = {
+    runtime: {
+      onMessage: { addListener: callback => { listener = callback; } },
+      onConnect: { addListener: callback => { connectListener = callback; } },
+      ...chromeOverrides.runtime,
     },
-    activeBackupController: null,
+    tabs: chromeOverrides.tabs,
+  };
+  execute(`${senderCheckSource}\n${listenerSource}\n${connectListenerSource}`, {
+    chrome,
+    ...globals,
   });
-  return { listener, writes };
+  return { listener, connectListener };
 }
 
-// Regression tests for the messaging response and error contracts.
-test('getColorScheme responds after saving the color scheme', async () => {
-  const { listener, writes } = background();
-  const responses = [];
-  assert.equal(listener({ message: 'getColorScheme', colorScheme: 'dark' }, {}, value => responses.push(value)), true);
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].colorScheme, 'dark');
-  assert.equal(responses.length, 1);
-  assert.equal(responses[0].success, true);
-});
-
+// Regression tests for extension-to-host messaging and sender checks.
 test('unknown messages do not promise an asynchronous response', async () => {
   const { listener } = background();
   const responses = [];
@@ -68,41 +64,85 @@ test('unknown messages do not promise an asynchronous response', async () => {
   assert.equal(responses.length, 0);
 });
 
-test('control: stopBackup still sends its synchronous response', () => {
+test('sync diagnostics reject a content-script caller before connecting to the local host', () => {
   const { listener } = background();
   const responses = [];
-  listener({ message: 'stopBackup' }, {}, value => responses.push(value));
-  assert.equal(responses.length, 1);
-  assert.equal(responses[0].message, 'stopBackup idle');
+  assert.equal(listener({ message: 'syncHostStatus' },
+    { id: 'not-our-extension', url: 'https://chatgpt.com/' }, value => responses.push(value)), false);
+  assert.match(responses[0].error, /must be started from the extension/);
 });
 
-test('popup rejects with the callback-scoped runtime error', async () => {
-  let reads = 0;
-  let inCallback = false;
-  const runtime = {
-    get lastError() {
-      assert.equal(inCallback, true, 'lastError is only available during the callback');
-      reads++;
-      return { message: 'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received.' };
+test('current-chat sync rejects a content-script caller before reading the active tab', () => {
+  const { listener } = background();
+  const responses = [];
+  assert.equal(listener({ message: 'syncCurrentChat' },
+    { id: 'not-our-extension', url: 'https://chatgpt.com/' }, value => responses.push(value)), false);
+  assert.match(responses[0].error, /started from the extension popup/);
+});
+
+test('API probe rejects a content-script caller before reading the active tab', () => {
+  const { listener } = background();
+  const responses = [];
+  assert.equal(listener({ message: 'syncApiProbe' },
+    { id: 'not-our-extension', url: 'https://chatgpt.com/' }, value => responses.push(value)), false);
+  assert.match(responses[0].error, /started from the extension popup/);
+});
+
+test('all-chat progress ports reject a content-script caller', () => {
+  const extensionId = 'extension-id';
+  const { connectListener } = background({
+    chrome: {
+      runtime: { id: extensionId, getURL: path => `chrome-extension://${extensionId}${path}` },
     },
-    sendMessage(_message, callback) {
-      queueMicrotask(() => {
-        inCallback = true;
-        try { callback(undefined); } finally { inCallback = false; }
-      });
-    },
+  });
+  let disconnected = false;
+  const port = {
+    name: 'local-sync-progress',
+    sender: { id: 'not-our-extension', url: 'https://chatgpt.com/' },
+    disconnect() { disconnected = true; },
   };
-  const sendMessage = execute(`${helperSource}\nsendMessage;`, { chrome: { runtime } });
-  await assert.rejects(sendMessage({ message: 'backUpAllAsJSON' }), {
-    message: 'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received.',
-  });
-  assert.equal(reads, 1, 'Transport error must be inspected inside the callback');
+  connectListener(port);
+  assert.equal(disconnected, true);
 });
 
-test('control: popup preserves successful responses', async () => {
-  const response = { message: 'backUpAllAsJSON done' };
-  const sendMessage = execute(`${helperSource}\nsendMessage;`, {
-    chrome: { runtime: { sendMessage: (_message, callback) => callback(response) } },
+test('popup API probe sends only its sanitized report to the host and confirms logging', async () => {
+  const probeReport = {
+    schemaVersion: 1,
+    probeId: '123e4567-e89b-12d3-a456-426614174000',
+    routeKind: 'conversation',
+    session: { status: 'ok', errorCategory: 'none', httpStatuses: [200], fields: [] },
+    defaultList: { status: 'ok', errorCategory: 'none', httpStatuses: [200], fields: [] },
+    orderedList: { status: 'ok', errorCategory: 'none', httpStatuses: [200], fields: [] },
+    archivedList: { status: 'ok', errorCategory: 'none', httpStatuses: [200], fields: [] },
+    defaultOrder: 'descending',
+    orderedOrder: 'descending',
+    orderSequenceChanged: 'same',
+    archiveRelation: 'disjoint',
+    projectListMembership: 'found',
+  };
+  let recordedReport;
+  const extensionId = 'extension-id';
+  const { listener } = background({
+    chrome: {
+      runtime: { id: extensionId, getURL: path => `chrome-extension://${extensionId}${path}` },
+      tabs: { query: async () => [{ url: 'https://chatgpt.com/c/private-chat-id' }] },
+    },
+    classifyApiProbeRoute: () => ({ routeKind: 'conversation', conversationId: 'private-chat-id' }),
+    collectChatGptApiProbe: async () => probeReport,
+    recordApiProbe: async report => {
+      recordedReport = report;
+      return { probeId: report.probeId, logged: true };
+    },
   });
-  assert.equal(await sendMessage({ message: 'backUpAllAsJSON' }), response);
+  const responses = [];
+  assert.equal(listener({ message: 'syncApiProbe' },
+    { id: extensionId, url: `chrome-extension://${extensionId}/popup.html` },
+    value => responses.push(value)), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(recordedReport, probeReport);
+  assert.deepEqual(JSON.parse(JSON.stringify(responses)), [{
+    probeId: probeReport.probeId,
+    logged: true,
+    warningCount: 0,
+  }]);
 });

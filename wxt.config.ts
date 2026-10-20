@@ -1,5 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
+import { existsSync, readFileSync } from 'node:fs';
+
+const localKeyPath = new URL('./.local/extension-key.pub.txt', import.meta.url);
+const localKey = existsSync(localKeyPath) ? readFileSync(localKeyPath, 'utf8').trim() : undefined;
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -8,13 +12,14 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: 'ChatGPT Backup - ChatGPT to PDF, MD, and more',
-    description: 'Backup your OpenAI ChatGPT history in either JSON or Markdown format',
+    ...(localKey ? { key: localKey } : {}),
+    name: 'ChatGPT Local Sync',
+    description: 'Sync your open ChatGPT conversation to a local database',
     action: {
-      default_title: 'ChatGPT Backup - ChatGPT to PDF, MD, and more',
+      default_title: 'ChatGPT Local Sync',
     },
     host_permissions: ['https://chatgpt.com/*'],
-    permissions: ['activeTab', 'downloads', 'storage'],
+    permissions: ['activeTab', 'nativeMessaging'],
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self';",
     },
