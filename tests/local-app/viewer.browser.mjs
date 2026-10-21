@@ -108,6 +108,9 @@ try {
 
   await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Conversation long-chat')).click()`);
   await until('document.querySelectorAll(".message").length === 100');
+  await until('!!document.querySelector(".saved-code")');
+  assert.equal(await evaluate('document.querySelector(".saved-code").textContent.includes("**Stored code stays literal**")'), true);
+  assert.equal(await evaluate('document.querySelector(".saved-code table")'), null);
   await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more messages').click()`);
   await until('document.querySelectorAll(".message").length === 200');
   await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more messages').click()`);
@@ -120,6 +123,34 @@ try {
   assert.equal(await evaluate('document.querySelector(".messages").innerText.includes("INACTIVE BRANCH ONLY")'), false);
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".message-meta strong")].map(node => node.textContent)'), ['user', 'assistant', 'tool']);
   assert.equal(await evaluate('!!document.querySelector(".unsupported")'), true);
+  await until('!!document.querySelector(".message-content h1")');
+  assert.equal(await evaluate('document.querySelector(".message-content h1").textContent'), 'Rendered Markdown heading');
+  assert.equal(await evaluate('[...document.querySelectorAll(".message-content strong")].some(node => node.textContent === "Bold text")'), true);
+  assert.equal(await evaluate('[...document.querySelectorAll(".message-content em")].some(node => node.textContent === "italic text")'), true);
+  assert.equal(await evaluate('[...document.querySelectorAll(".message-content del")].some(node => node.textContent === "deleted text")'), true);
+  assert.equal(await evaluate('document.querySelector(".message-content blockquote").textContent.trim()'), 'Quoted text');
+  assert.equal(await evaluate('document.querySelectorAll(".message-content table").length'), 2);
+  assert.equal(await evaluate('[...document.querySelectorAll(".message-content td")].some(node => node.textContent === "Rendered HTML cell")'), true);
+  assert.equal(await evaluate('[...document.querySelectorAll(".message-content strong")].some(node => node.textContent === "Safe inline HTML")'), true);
+  assert.equal(await evaluate('document.querySelector(".message-content details summary").textContent'), 'More detail');
+  assert.equal(await evaluate('document.querySelector(".message-content input[type=checkbox]").disabled'), true);
+  assert.equal(await evaluate('document.querySelector(".message-content code.language-js").textContent.includes("<b>Literal code</b>")'), true);
+  assert.equal(await evaluate('document.querySelector(".message-content code.language-js b")'), null);
+  assert.equal(await evaluate('document.querySelectorAll(".message-content .blocked-media").length'), 2);
+  assert.equal(await evaluate('document.querySelector(".message-content a").getAttribute("target")'), '_blank');
+  assert.equal(await evaluate('document.querySelector(".message-content a").getAttribute("rel")'), 'noopener noreferrer');
+  assert.equal(await evaluate('document.querySelectorAll(".message-content a[href^=javascript], .message-content [onclick], .message-content [onerror], .message-content [style], .message-content iframe, .message-content style, .message-content form").length'), 0);
+  assert.equal(await evaluate('document.querySelectorAll(".html-preview").length'), 0);
+  assert.equal(await evaluate('document.querySelector(".html-code-block pre").textContent.includes("<h3>HTML preview heading</h3>")'), true);
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Preview HTML').click()`);
+  await until('!!document.querySelector(".html-preview h3")');
+  assert.equal(await evaluate('document.querySelector(".html-preview h3").textContent'), 'HTML preview heading');
+  assert.equal(await evaluate('document.querySelector(".html-preview td").textContent'), 'Preview cell');
+  assert.equal(await evaluate('document.querySelector(".html-preview .blocked-media").textContent'), '[Image not loaded: Preview diagram]');
+  assert.equal(await evaluate('document.querySelectorAll(".html-preview script, .html-preview iframe, .html-preview img, .html-preview [style], .html-preview [onclick]").length'), 0);
+  assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Hide HTML preview').click()`);
+  await until('!document.querySelector(".html-preview")');
   await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Branch <img')).click()`);
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 3, 'Selecting an already-open chat must not clear it');
 
@@ -168,7 +199,7 @@ try {
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
   assert.deepEqual(externalRequests, [], 'Viewer must not request remote resources');
   assert.deepEqual(exceptions, [], 'Viewer must not throw browser runtime errors');
-  console.log('Viewer browser checks passed: project/GPT folders, scoped filtering, refresh, paging, tree order, account switching, inert content, narrow layout, revision reload, offline resources, and private launch.');
+  console.log('Viewer browser checks passed: Markdown/raw HTML, opt-in HTML code preview, sanitization and blocked media, literal code, folders, refresh, paging, account switching, narrow layout, revision reload, and private launch.');
 } finally {
   ws?.close();
   if (browser && browser.exitCode === null) browser.kill();

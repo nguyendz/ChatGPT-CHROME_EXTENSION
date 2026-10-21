@@ -44,10 +44,10 @@ Wave 2/3 repeat-sync acceptance checks.
 | Milestone | Deliverable | Release gate |
 |---|---|---|
 | **6A - Browse and read** | Start a local viewer, list saved chats, choose an account/chat, read the active branch, refresh from the DB. | The current 10 chats are browseable offline without modifying the archive. |
-| **6B - Navigate and find** | Branch navigation, safe richer message rendering, and account-scoped FTS5 search. | Search results open the correct chat and branch; indexing stays correct after sync. |
+| **6B - Navigate and find** | Branch navigation and account-scoped FTS5 search; safe richer rendering is already included in 6A. | Search results open the correct chat and branch; indexing stays correct after sync. |
 | **6C - Export** | Explicit user-requested Markdown and raw JSON downloads from saved data. | Export scope is clear and the DB stays unchanged. |
 
-Not required for 6A: FTS indexing, Markdown parsing, alternate-branch controls,
+Not required for 6A: FTS indexing, alternate-branch controls,
 exports, assets, a desktop installer, a popup launch button, or an MCP server.
 Not part of this wave: editing/deleting chats, syncing from the viewer,
 reconciliation, automatic sync, cloud hosting, or exposing the server on a LAN.
@@ -114,8 +114,11 @@ Native sync host ------------------> same DB through the existing WAL writer
 - Require authentication on every data/export route. Do not use ambient cookies.
 - Use `Cache-Control: no-store`, a restrictive content security policy, and
   a no-referrer policy. Keep chat contents and tokens out of server logs.
-- Render stored content as untrusted data. In 6A use escaped, whitespace-preserving
-  text, not `innerHTML`; do not execute stored HTML, scripts, or embedded objects.
+- Render stored content as untrusted data. Markdown and raw HTML now pass through
+  an allowlist sanitizer before React rendering, never unsanitized `innerHTML`.
+  Code remains escaped; fenced HTML has an opt-in sanitized preview. Scripts,
+  event handlers, inline styles, forms, embedded objects/pages, and automatic
+  media requests stay disabled.
 - No arbitrary filesystem path, SQL, or write endpoint is exposed.
 
 ## 4. Wave 6A user experience
@@ -195,7 +198,7 @@ milestones separate; the viewer is not another sync writer.
 | **6A.2 Local server** | `local-app/viewer/server.ts`; static assets, authenticated routes, local binding, error mapping, shutdown. | 6A.1 | Ephemeral-port startup works; missing token, foreign Host/Origin, invalid input, and missing DB are rejected. |
 | **6A.3 UI/build** | `local-app/viewer/ui/`, viewer Vite config, root package scripts, type-check coverage. | Read contracts; final integration needs 6A.2 | Locally built React UI lists/selects/reads chats, handles all states, and performs no remote fetches. |
 | **6A.4 Integrated acceptance** | `tests/local-app/viewer*.test.mjs`, browser smoke test, README/privacy updates. | 6A.1-6A.3 | Isolated tests pass, concurrent sync/read works, then the user can read the existing 10-chat archive offline. |
-| **6B.1 Branches/rendering** | Reader branch selection and UI branch controls; safe Markdown/code rendering if added. | 6A accepted | Switching sibling branches preserves shared ancestry and never changes stored `current_node`; hostile markup is inert. |
+| **6B.1 Branches** | Reader branch selection and UI branch controls, reusing the existing safe Markdown/code renderer. | 6A accepted | Switching sibling branches preserves shared ancestry and never changes stored `current_node`; hostile markup is inert. |
 | **6B.2 Search indexing** | Host-owned schema migration and FTS maintenance; viewer search queries. | 6A accepted; coordinate host/viewer schema compatibility | Existing rows are backfilled; insert/update/delete/rollback tests keep the index consistent; cross-account results are excluded. |
 | **6B.3 Search UI** | Query input, bounded snippets, result-to-branch navigation. | 6B.1, 6B.2 | A result from an inactive branch opens that branch and locates the matching message; invalid FTS syntax is reported clearly. |
 | **6C.1 Export** | DB-backed Markdown serializer and raw JSON download routes/UI. | 6B accepted | Downloads match the documented scope, have safe filenames, and do not modify the DB. |
@@ -287,10 +290,15 @@ During a self-contained browser check, stop the test server/browser afterward.
   for custom GPTs. Missing markers and unclassified markers remain separate.
   Labels are explicitly unnamed/provisional because project names are not in
   the archive. No migration or database write is needed.
+- Rich rendering was added at the user's request: GFM Markdown, sanitized raw
+  HTML, opt-in HTML-code previews, readable tables/code, safe external links,
+  and blocked-image placeholders. This does not enable branch navigation,
+  search, or exports. Browser fixtures check formatted output and malicious
+  markup in both normal messages and HTML previews.
 - `tests/local-app/viewer.test.mjs`: synthetic read-only, account, branch,
   concurrency, API boundary, size-limit, and performance checks.
 - `tests/local-app/viewer.browser.mjs`: real Chrome checks for pagination,
-  account switching, escaped hostile content, keyboard selection, narrow
+  account switching, sanitized hostile markup, keyboard selection, narrow
   layout, changed-revision reload, local-only requests, and missing-token state.
 - A fixture with 1,000 chats / 50,000 message rows returned a first 50-chat
   page in 2.2 ms and its first message page in 0.2 ms on this machine.

@@ -52,7 +52,33 @@ select { width: 100%; padding: 9px; border: 1px solid #d8e1d8; border-radius: 7p
 .message-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 12px; }
 .message-meta strong { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #3c6a50; }
 .message-meta span { font-size: 10px; color: #879186; }
-.message pre { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; margin: 0; font: 14px/1.85 "Segoe UI", system-ui, sans-serif; color: #34443b; tab-size: 2; }
+.message-content { font-size: 14px; line-height: 1.85; color: #34443b; overflow-wrap: anywhere; display: flow-root; }
+.message-content p { margin: 0 0 14px; }
+.message-content > :last-child { margin-bottom: 0; }
+.message-content h1, .message-content h2, .message-content h3, .message-content h4, .message-content h5, .message-content h6 { line-height: 1.4; margin: 24px 0 12px; font-weight: 650; }
+.message-content h1 { font-size: 25px; } .message-content h2 { font-size: 22px; } .message-content h3 { font-size: 18px; }
+.message-content ul, .message-content ol { padding-left: 24px; margin: 10px 0 16px; }
+.message-content li > p { margin-bottom: 6px; }
+.message-content blockquote { border-left: 3px solid #93b59c; padding: 4px 16px; margin: 16px 0; color: #627368; background: #f7faf4; }
+.message-content a { color: #147455; text-decoration: underline; text-underline-offset: 3px; }
+.message-content code, .message pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
+.message-content :not(pre) > code { background: #edf1e9; padding: 2px 5px; border-radius: 4px; }
+.message pre { white-space: pre; overflow-wrap: normal; overflow-x: auto; max-width: 100%; margin: 14px 0; padding: 16px; line-height: 1.7; color: #34443b; background: #f1f4ed; border: 1px solid #dfe7d9; border-radius: 7px; tab-size: 2; }
+.message-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 16px 0; }
+.message-content th, .message-content td { border: 1px solid #d1decf; padding: 8px 12px; text-align: left; vertical-align: top; min-width: 90px; }
+.message-content th { background: #eaf1e6; font-weight: 650; }
+.message-content tr:nth-child(even) { background: #f7f9f4; }
+.message-content hr { border: 0; border-top: 1px solid #d7e2d3; margin: 22px 0; }
+.message-content details { border: 1px solid #d7e2d3; border-radius: 6px; padding: 10px 12px; margin: 14px 0; }
+.message-content summary { cursor: pointer; font-weight: 600; }
+.message-content input[type="checkbox"] { margin-right: 7px; }
+.blocked-media, .preview-note { color: #795b23; font-size: 11px; }
+.html-code-block { margin: 16px 0; border: 1px solid #d7e2d3; border-radius: 8px; overflow: hidden; }
+.code-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; background: #eaf1e6; font-size: 11px; }
+.code-toolbar button { font-size: 11px; padding: 5px 9px; }
+.html-code-block > pre { margin: 0; border: 0; border-radius: 0; }
+.html-preview { padding: 16px; border-top: 1px solid #d7e2d3; background: #fff; }
+.html-preview .preview-note { margin-bottom: 14px; }
 .unsupported { font-size: 11px; margin-bottom: 12px; color: #795b23; }
 .state { padding: 22px 12px; font-size: 13px; color: #758276; }
 .state button, .banner button { margin-left: 8px; }

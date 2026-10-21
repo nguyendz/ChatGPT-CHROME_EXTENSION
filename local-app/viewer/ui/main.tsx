@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { isAccounts, isDetail, isGroups, isMessage, isPage, isStatus, isSummary } from '../types.ts';
 import type { Account, ArchiveStatus, ConversationDetail, ConversationGroup, Page } from '../types.ts';
+import { MessageContent } from './message-content.tsx';
 import './style.css';
 
 const token = new URLSearchParams(location.hash.slice(1)).get('token');
@@ -226,14 +227,13 @@ function App() {
               <h2>{detail.title?.trim() || 'Untitled conversation'}</h2>
               <p>Updated {date(detail.updateTime)} / Synced {date(detail.lastSyncedAt)}</p>
               <p>{detail.activeMessageCount} active messages / {detail.otherMessageCount} other stored messages</p>
-              <div className="reader-note">Text-only preview. Images and attachments are not downloaded or rendered. Alternate-branch navigation is coming later.</div>
               {detail.warnings.map(warning => <p className="banner warning" role="alert" key={warning}>{warning}</p>)}
             </div>
             <div className="messages" aria-label="Active branch messages">
               {messages.items.map(message => <article className={`message ${message.role === 'user' ? 'user' : 'other'}`} key={message.id}>
                 <div className="message-meta"><strong>{message.role || 'unknown'}</strong><span>{message.model}{message.model ? ' / ' : ''}{date(message.createTime)}</span></div>
                 {message.unsupportedContent && <p className="unsupported">Contains unsupported content or attachment references; only saved text/reference data is shown.</p>}
-                <pre>{message.text || '[No saved text in this message]'}</pre>
+                <MessageContent text={message.text} contentType={message.contentType} />
               </article>)}
               {!messages.loading && !messages.error && !messages.items.length && <p className="state">No messages on a valid saved active branch.</p>}
               {messages.loading && <p className="state" role="status">Reading messages...</p>}

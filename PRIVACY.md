@@ -45,8 +45,13 @@ memory. The viewer does not use authentication cookies or persist that token.
 Do not share the launch URL or screenshots containing it.
 
 The viewer does not modify archive rows, migrate the database, or start syncs.
-It renders saved text as untrusted escaped content and does not automatically
-download or display remote images or attachments. Viewer request logs exclude
+It treats saved messages as untrusted content: Markdown and raw HTML pass
+through an allowlist sanitizer before React rendering. HTML code-block previews
+are opt-in; code itself remains escaped. Scripts, event handlers, inline styles,
+forms, and embedded pages are disabled. Images are replaced with text
+placeholders, and remote images/attachments are not downloaded or displayed.
+External links require an explicit click and open without opener/referrer access.
+Viewer request logs exclude
 chat content, account identifiers, and the launch token; only the explicit
 startup URL printed to the user's terminal contains the token.
 

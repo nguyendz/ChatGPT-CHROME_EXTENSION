@@ -79,9 +79,16 @@ database, migrates its schema, or starts a sync.
   Do not share it or terminal screenshots containing it.
 - The app works without ChatGPT access or a running extension. Viewing is
   read-only and does not finalize or interfere with sync runs.
-- This first milestone is an escaped text preview. Images and attachments
-  are not fetched/rendered, and alternate branches are counted but not shown.
-  Branch navigation, search, and exports are later Wave 6 milestones.
+- Messages render Markdown (including tables, lists, quotes, tasks, and code)
+  and sanitized HTML such as tables and expandable details. Fenced `html`/`htm`
+  blocks keep their source visible and offer an opt-in **Preview HTML** button.
+  Stored code messages and code examples remain escaped, not executed.
+- HTML scripts, event handlers, inline styles, forms, and embedded pages are
+  disabled. Images become labeled placeholders without downloading anything;
+  external links open only after a click in a separate tab. No automatic remote
+  requests are made.
+- Attachments are not fetched/rendered, and alternate branches are counted but
+  not shown. Branch navigation, search, and exports are later Wave 6 milestones.
 
 The viewer currently supports archive schema 3. It reads at most 50 chats or
 100 messages per default page (maximum 100 / 200), with explicit errors for
