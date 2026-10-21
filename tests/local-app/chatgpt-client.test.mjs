@@ -125,3 +125,64 @@ test('client reports malformed or failed API responses explicitly', async t => {
   globalThis.fetch = async () => new Response('{}', { status: 503 });
   await assert.rejects(loadToken(), /ChatGPT session \(503\)/);
 });
+
+test('debug captures complete list and detail bodies before validation without request credentials', async t => {
+  const events = [];
+  const token = 'synthetic-debug-secret';
+  const logApi = async event => { events.push(event); };
+  const listBody = JSON.stringify({ items: [{ id: 'chat-1', title: 'Private title' }], unknown: 'preserved' });
+  withFetch(t, async () => new Response(listBody, { status: 200 }));
+  await assert.rejects(fetchConversationListPage(token, 50, 50, undefined, logApi), /invalid conversation list response/);
+  assert.deepEqual(events[0], {
+    kind: 'response', url: 'https://chatgpt.com/backend-api/conversations?offset=50&limit=50',
+    attempt: 1, status: 200, body: listBody,
+  });
+
+  const detailBody = JSON.stringify({ conversation_id: 'chat-1', mapping: {}, title: 'Private title' });
+  globalThis.fetch = async () => new Response(detailBody);
+  assert.equal((await fetchConversation(token, 'chat-1', 1, 1, undefined, logApi)).conversation_id, 'chat-1');
+  assert.equal(events[1].body, detailBody);
+
+  globalThis.fetch = async () => new Response(`<html>bad JSON ${token}</html>`);
+  await assert.rejects(fetchConversationListPage(token, 0, 50, undefined, logApi), SyntaxError);
+  assert.equal(events[2].body, '<html>bad JSON [REDACTED]</html>');
+
+  globalThis.fetch = async () => new Response(`denied ${token}`, { status: 403 });
+  await assert.rejects(fetchConversation(token, 'chat-1', 1, 1, undefined, logApi), /403/);
+  assert.equal(events[3].status, 403);
+  assert.equal(events[3].body, 'denied [REDACTED]');
+  assert.equal(JSON.stringify(events).includes(token), false);
+  assert.equal(JSON.stringify(events).includes('authorization'), false);
+});
+
+test('debug records network errors and cannot silently fail', async t => {
+  const events = [];
+  withFetch(t, async () => { throw new TypeError('network failed'); });
+  await assert.rejects(fetchConversation('secret', 'chat-1', 1, 1, undefined, async event => {
+    events.push(event);
+  }), /network failed/);
+  assert.deepEqual(events, [{
+    kind: 'network-error', url: 'https://chatgpt.com/backend-api/conversation/chat-1',
+    attempt: 1, error: 'network failed',
+  }]);
+  globalThis.fetch = async () => new Response('{"mapping":{}}');
+  await assert.rejects(fetchConversation('secret', 'chat-1', 1, 1, undefined, async () => {
+    throw new Error('debug write failed');
+  }), /debug write failed/);
+});
+
+test('debug captures every HTTP retry attempt before returning the successful response', async t => {
+  const events = [];
+  let calls = 0;
+  withFetch(t, async () => {
+    calls++;
+    return calls === 1
+      ? new Response('temporary service error', { status: 503 })
+      : new Response('{"mapping":{}}');
+  });
+  await fetchConversation('secret', 'chat-1', 2, 1, undefined, async event => { events.push(event); });
+  assert.deepEqual(events.map(event => ({ attempt: event.attempt, status: event.status, body: event.body })), [
+    { attempt: 1, status: 503, body: 'temporary service error' },
+    { attempt: 2, status: 200, body: '{"mapping":{}}' },
+  ]);
+});

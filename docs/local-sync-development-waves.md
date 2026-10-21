@@ -36,7 +36,7 @@ flowchart LR
 | 3 | **Sync MVP**: incremental sync of all chats with early stop, progress, and Stop. | ~3–4 days |
 | 4 | Deleted, archived, and project chats; auto-sync; live sync. | ~3 days |
 | 5 | Images and attachments in a content-addressed store. | ~2 days |
-| 6 | Local viewer: browse, search (FTS5), and export from the DB. | ~3–5 days |
+| 6 | Local viewer, staged: **6A browse/read**, then **6B branches/search (FTS5)**, then **6C MD/JSON export**. See the [Wave 6 plan](./local-sync-wave-6-plan.md). | Estimate after 6A implementation |
 
 ---
 
@@ -353,12 +353,32 @@ gated early-stop paging optimization.
 | W5.3 | Engine: collect references with `findAssetReferences`/`findAttachmentReferences`, download with `downloadFileBlob`, and apply per-asset and per-run size limits. Options toggles. | W5.1 |
 
 ## Wave 6 — Local viewer app
+
+The [detailed Wave 6 plan](./local-sync-wave-6-plan.md) is approved in scope:
+a separate localhost browser app, with **browse/read first** and
+branch navigation, search, and export delivered as later milestones.
+Wave 6A is implemented: read-only archive reader, authenticated loopback server,
+standalone React UI, synthetic API tests, and an isolated real-Chrome check.
+A real-archive API smoke test opened all 10 chats and read 559 active messages
+out of 566 stored rows with no branch warnings. Final user visual acceptance
+is pending; Wave 6B/6C remain planned.
+
+Read-only inspection on 2026-10-20 confirmed schema 3 with **10 conversations
+and 566 stored message rows**; the latest incremental run completed with no
+failures. This is enough to begin the viewer; it does not establish full remote
+coverage or close every Wave 2/3 acceptance gate.
+
 | ID | Task | Depends |
 |---|---|---|
-| W6.1 | `local-app/viewer`: a Node HTTP server bound to `127.0.0.1` with a random port and a token printed to the console. It opens `sync.db` **read-only** in WAL mode. | W3 |
-| W6.2 | UI: conversation list, conversation view (active branch plus a branch toggle), and FTS5 search (migration adds `messages_fts`). | W6.1 |
-| W6.3 | Export from the DB to MD/JSON, reusing `lib/export-document.ts`. | W6.2 |
-| W6.4 | *(Optional)* A read-only MCP server or API so other tools can query the archive. | W6.1 |
+| W6.1 / 6A | `local-app/viewer`: Node HTTP server bound to `127.0.0.1` on an OS-selected port, per-process token, separate **read-only** SQLite connection; no viewer migrations or sync-run maintenance. | Existing W3 schema/data |
+| W6.2a / 6A | Account-scoped paginated list and active-branch transcript in tree order; explicit loading/error/empty states and Refresh. | W6.1 |
+| W6.2b / 6B | Alternate-branch navigation and FTS5 search. The native host owns index migration/backfill/maintenance; the viewer remains read-only. | 6A acceptance |
+| W6.3 / 6C | Explicit DB-to-MD/JSON downloads, reusing compatible parts of `lib/export-document.ts`; branch scope is labeled. | 6B acceptance |
+| W6.4 | *(Optional later)* A read-only MCP server/API for other tools; not required for browse/read. | W6.1 and explicit follow-up scope |
+
+**First exit gate:** open the currently stored chats without ChatGPT access,
+preserve account/branch correctness, and leave archive rows/schema/run state
+unchanged. See the detailed plan for fixtures, validation, and later milestones.
 
 ---
 

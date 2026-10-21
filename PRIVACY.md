@@ -24,7 +24,31 @@ The extension does not persist the ChatGPT access token. It is held in
 service-worker memory only while making ChatGPT requests and is never sent to
 the local host.
 
+Sync debugging additionally stores full conversation-list and conversation-detail
+response bodies, request URLs, HTTP status/attempt information, network errors,
+and pagination decisions in `logs\api-debug.jsonl` under the same local data
+directory. This includes private chat titles, IDs, messages, and metadata,
+including responses rejected by validation. It does not capture session
+responses, request headers, or cookies, and redacts the active access token
+from response bodies and network errors. The debug log stays local, is
+append-only without automatic rotation, and can be deleted manually. Review
+and redact it before sharing; the separate sanitized API probe is unchanged.
+
 ## Network requests
+
+The optional local archive viewer is a separate, user-started process bound
+only to `127.0.0.1` on an OS-selected port. Its UI and API read the local SQLite
+archive without contacting ChatGPT, a CDN, or an analytics service. Access to
+archive data requires the per-process token in the private launch URL; the
+browser removes that token from its address bar and keeps it only in tab
+memory. The viewer does not use authentication cookies or persist that token.
+Do not share the launch URL or screenshots containing it.
+
+The viewer does not modify archive rows, migrate the database, or start syncs.
+It renders saved text as untrusted escaped content and does not automatically
+download or display remote images or attachments. Viewer request logs exclude
+chat content, account identifiers, and the launch token; only the explicit
+startup URL printed to the user's terminal contains the token.
 
 The extension makes requests to `https://chatgpt.com/*` to read the current
 session and conversation after a user action. Conversation data is sent only

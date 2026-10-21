@@ -1,4 +1,5 @@
 import type { ChatGptRawConversation } from './chatgpt-parse.ts';
+import type { ApiDebugLogger } from './sync/api-debug.ts';
 
 export type ChatGptAccount = {
   userId: string;
@@ -12,6 +13,7 @@ export type ChatGptConversationListItem = {
 };
 
 export type ChatGptConversationListPage = {
+  // The API may report an offset-dependent lower bound, not an exact list size.
   total: number;
   items: ChatGptConversationListItem[];
 };
@@ -161,13 +163,29 @@ async function fetchApiResponse(
   signal?: AbortSignal,
   maxAttempts = 5,
   firstAttempt = 1,
+  logApi?: ApiDebugLogger,
 ): Promise<Response> {
   for (let attempt = firstAttempt; attempt <= maxAttempts; attempt++) {
     if (signal?.aborted) throw abortError();
-    const response = await fetch(url, {
-      headers: { authorization: `Bearer ${token}` },
-      ...(signal ? { signal } : {}),
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { authorization: `Bearer ${token}` },
+        ...(signal ? { signal } : {}),
+      });
+    } catch (error) {
+      await logApi?.({
+        kind: 'network-error', url, attempt,
+        error: (error instanceof Error ? error.message : String(error)).replaceAll(token, '[REDACTED]'),
+      });
+      throw error;
+    }
+    if (logApi) {
+      await logApi({
+        kind: 'response', url, attempt, status: response.status,
+        body: (await response.clone().text()).replaceAll(token, '[REDACTED]'),
+      });
+    }
     if (response.ok) return response;
     if (response.status === 401) clearTokenCache();
     if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
@@ -192,6 +210,7 @@ export async function fetchConversationListPage(
   offset: number,
   limit = CONVERSATION_LIST_PAGE_SIZE,
   signal?: AbortSignal,
+  logApi?: ApiDebugLogger,
 ): Promise<ChatGptConversationListPage> {
   if (!Number.isSafeInteger(offset) || offset < 0 ||
     !Number.isSafeInteger(limit) || limit < 1 || limit > CONVERSATION_LIST_PAGE_SIZE) {
@@ -201,7 +220,7 @@ export async function fetchConversationListPage(
     const url = new URL('https://chatgpt.com/backend-api/conversations');
     url.searchParams.set('offset', String(offset));
     url.searchParams.set('limit', String(limit));
-    const response = await fetchApiResponse(token, url.toString(), 'conversation list', signal);
+    const response = await fetchApiResponse(token, url.toString(), 'conversation list', signal, 5, 1, logApi);
     const value: unknown = await response.json();
     if (!isRecord(value) || !Array.isArray(value.items) || typeof value.total !== 'number' ||
       !Number.isSafeInteger(value.total) || value.total < 0 ||
@@ -226,6 +245,7 @@ export async function fetchConversation(
   maxAttempts = 5,
   attempt = 1,
   signal?: AbortSignal,
+  logApi?: ApiDebugLogger,
 ): Promise<ChatGptRawConversation> {
   if (signal?.aborted) throw abortError();
   return requestChatGpt(async () => {
@@ -236,6 +256,7 @@ export async function fetchConversation(
       signal,
       maxAttempts,
       attempt,
+      logApi,
     );
 
     const value: unknown = await response.json();

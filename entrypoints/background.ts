@@ -101,7 +101,7 @@ export default defineBackground(() => {
         return syncCurrentConversation(
           conversationId,
           account,
-          () => fetchConversation(token, conversationId),
+          logApi => fetchConversation(token, conversationId, 5, 1, undefined, logApi),
         );
       })().then(sendResponse).catch(error => sendResponse({ error: getErrorMessage(error) }));
       return true;

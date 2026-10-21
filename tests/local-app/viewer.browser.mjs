@@ -1,0 +1,178 @@
+// Real Chrome in a disposable profile, using only a synthetic local archive.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { startViewer } from '../../local-app/viewer/server.ts';
+import { seedViewer, simpleRaw, writeConversation } from '../fixtures/viewer-archive.mjs';
+
+const directory = await mkdtemp(join(tmpdir(), 'chatgpt-viewer-browser-'));
+let viewer;
+let browser;
+let closed;
+let ws;
+try {
+  const { accountB } = seedViewer(directory, 52);
+  viewer = await startViewer({ directory });
+  const browserPath = process.env.CHROMIUM_PATH ?? join(process.env.ProgramFiles, 'Google', 'Chrome', 'Application', 'chrome.exe');
+  browser = spawn(browserPath, [
+    '--headless=new', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
+    `--user-data-dir=${join(directory, 'profile')}`, 'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  closed = once(browser, 'close');
+  closed.catch(() => {});
+  const endpoint = await new Promise((accept, reject) => {
+    let log = '';
+    const timer = setTimeout(() => reject(new Error('Chrome startup timed out.')), 15_000);
+    browser.once('error', error => { clearTimeout(timer); reject(error); });
+    browser.once('exit', code => { clearTimeout(timer); reject(new Error(`Chrome exited ${code}.`)); });
+    browser.stderr.on('data', chunk => {
+      log += chunk;
+      const match = log.match(/DevTools listening on (ws:\/\/\S+)/);
+      if (match) { clearTimeout(timer); accept(match[1]); }
+    });
+  });
+  ws = new WebSocket(endpoint);
+  await new Promise((accept, reject) => {
+    ws.addEventListener('open', accept, { once: true });
+    ws.addEventListener('error', reject, { once: true });
+  });
+  let requestId = 0;
+  const pending = new Map();
+  const externalRequests = [];
+  const exceptions = [];
+  ws.addEventListener('message', ({ data }) => {
+    const message = JSON.parse(data);
+    if (message.method === 'Network.requestWillBeSent' && /^https?:/.test(message.params.request.url) &&
+      !message.params.request.url.startsWith(viewer.origin + '/')) externalRequests.push(message.params.request.url);
+    if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.text);
+    const request = pending.get(message.id);
+    if (!request) return;
+    pending.delete(message.id);
+    clearTimeout(request.timer);
+    if (message.error) request.reject(new Error(JSON.stringify(message.error)));
+    else request.accept(message.result);
+  });
+  const command = (method, params = {}, sessionId) => new Promise((accept, reject) => {
+    const id = ++requestId;
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out.`)); }, 15_000);
+    pending.set(id, { accept, reject, timer });
+    ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+  });
+  const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await command('Target.attachToTarget', { targetId, flatten: true });
+  const evaluate = async expression => {
+    const result = await command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId);
+    if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
+    return result.result.value;
+  };
+  async function until(expression) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (await evaluate(expression)) return;
+      await new Promise(accept => setTimeout(accept, 50));
+    }
+    throw new Error(`Browser check timed out: ${expression}`);
+  }
+  await command('Runtime.enable', {}, sessionId);
+  await command('Network.enable', {}, sessionId);
+  await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
+  await command('Network.setBlockedURLs', { urls: ['https://*', 'http://example.*'] }, sessionId);
+  await command('Page.navigate', { url: viewer.url }, sessionId);
+  await until('document.querySelectorAll(".chat-item").length === 50');
+  assert.equal(await evaluate('location.hash'), '', 'Launch token must be removed from the address bar');
+  assert.equal(await evaluate('document.body.innerText.includes("Local only / Read-only")'), true);
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more conversations').click()`);
+  await until('document.querySelectorAll(".chat-item").length === 54');
+  await command('Page.bringToFront', {}, sessionId);
+  await until('document.hasFocus()');
+  await evaluate('document.querySelector(".chat-item").focus()');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 }, sessionId);
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+  await until('!!document.querySelector(".conversation-heading")');
+
+  await until('document.querySelectorAll(".folder-item").length === 6');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 2');
+  assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
+  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true]").textContent'), 'Unnamed project 12');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed custom GPT 1')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item strong").textContent === "Untitled conversation"');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Other marked chats')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item").textContent.includes("extra-001")');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('No project marker')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 49');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('All conversations')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 50');
+
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Conversation long-chat')).click()`);
+  await until('document.querySelectorAll(".message").length === 100');
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more messages').click()`);
+  await until('document.querySelectorAll(".message").length === 200');
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more messages').click()`);
+  await until('document.querySelectorAll(".message").length === 205');
+
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Branch <img')).click()`);
+  await until('document.querySelectorAll(".message").length === 3');
+  assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
+  assert.equal(await evaluate('document.querySelectorAll(".reader script, .reader img").length'), 0);
+  assert.equal(await evaluate('document.querySelector(".messages").innerText.includes("INACTIVE BRANCH ONLY")'), false);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".message-meta strong")].map(node => node.textContent)'), ['user', 'assistant', 'tool']);
+  assert.equal(await evaluate('!!document.querySelector(".unsupported")'), true);
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Branch <img')).click()`);
+  assert.equal(await evaluate('document.querySelectorAll(".message").length'), 3, 'Selecting an already-open chat must not clear it');
+
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }, sessionId);
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".sidebar")).display'), 'none');
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  await evaluate('document.querySelector(".back-button").click()');
+  await until('getComputedStyle(document.querySelector(".sidebar")).display !== "none"');
+  await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
+
+  await evaluate(`(() => {
+    const select = document.querySelector('#account');
+    select.value = ${JSON.stringify(accountB)};
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item").textContent.includes("other-account-chat")');
+  assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
+  await until('document.querySelectorAll(".folder-item").length === 2');
+  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true] span").textContent'), 'All conversations');
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
+  await until('document.querySelector(".folder-item[aria-current=true] span").textContent === "Unnamed project 1"');
+  assert.equal(await evaluate('document.querySelectorAll(".chat-item").length'), 1);
+
+  await evaluate(`document.querySelector('#account').value = [...document.querySelector('#account').options].find(option => option.value !== ${JSON.stringify(accountB)}).value;
+    document.querySelector('#account').dispatchEvent(new Event('change', { bubbles: true }));`);
+  await until('document.querySelectorAll(".chat-item").length === 50');
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Conversation long-chat')).click()`);
+  await until('document.querySelectorAll(".message").length === 100');
+  writeConversation(directory, simpleRaw('long-chat', 206), undefined, 'browser-concurrent-update');
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more messages').click()`);
+  await until('document.body.innerText.includes("changed during sync")');
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Reload conversation').click()`);
+  await until('document.body.innerText.includes("206 active messages") && document.querySelectorAll(".message").length === 100');
+
+  await evaluate('document.querySelector(".header-controls button").focus()');
+  assert.equal(await evaluate('document.activeElement.textContent'), 'Refresh archive');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".header-controls button")).outlineStyle'), 'solid');
+  assert.equal(await evaluate('!!document.querySelector("button").disabled'), false);
+  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
+  await until('document.querySelectorAll(".chat-item").length === 2');
+  await evaluate('document.querySelector(".header-controls button").click()');
+  await until('document.querySelectorAll(".folder-item").length === 6 && document.querySelectorAll(".chat-item").length === 2');
+  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true] span").textContent'), 'Unnamed project 1');
+  await command('Page.reload', {}, sessionId);
+  await until('document.body.innerText.includes("This tab has no access token")');
+  assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
+  assert.deepEqual(externalRequests, [], 'Viewer must not request remote resources');
+  assert.deepEqual(exceptions, [], 'Viewer must not throw browser runtime errors');
+  console.log('Viewer browser checks passed: project/GPT folders, scoped filtering, refresh, paging, tree order, account switching, inert content, narrow layout, revision reload, offline resources, and private launch.');
+} finally {
+  ws?.close();
+  if (browser && browser.exitCode === null) browser.kill();
+  if (closed) await closed;
+  if (viewer) await viewer.close();
+  await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+}

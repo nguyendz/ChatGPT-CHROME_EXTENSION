@@ -153,8 +153,10 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
 ### 6.3 Incremental sync (default)
 ```
 1. ext → host  beginRun {runId, mode:"incremental", account}
-2. ext reads every /backend-api/conversations page (50 per page), validating
-   duplicates and total stability; it retries one unstable scan from offset 0.
+2. ext reads /backend-api/conversations pages (up to 50 per request) until an
+   empty page confirms the end, advancing the offset by the returned item count.
+   The API total is a hint, not an exact count; changing totals and short pages
+   do not end or invalidate a scan. Duplicate IDs trigger one retry from offset 0.
 3. In latest-10 validation mode, sort the complete list by comparable,
    parseable update_time values and select up to 10. The All chats mode selects
    every item. Never infer recency or completeness from page order.
@@ -168,8 +170,19 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
 7. ext → host  endRun {runId, cancelled, failures}
 ```
 - Early-stop paging is not implemented. Every list page is read so latest-10 selection does not depend on unverified API ordering.
+- The observed API returns offset-dependent totals such as 51 at offset 0 and
+  101 at offset 50, each with 50 items. Listing progress shows only the number
+  read; the exact total is set after an empty page is received. The terminal
+  request is required even after a short page or an advertised exact total.
 - If latest-10 timestamps are missing, invalid, or mixed between strings and numbers, the run fails with a prompt to select **All chats** rather than guessing.
 - `newMessageCount` counts message IDs not previously stored for a conversation; it is separate from the number of new chats and the total messages in the response.
+- Sync captures full list/detail HTTP response bodies before validation in the
+  private local `logs\api-debug.jsonl` file, including retry/error responses.
+  Pagination entries identify the scan, offset, item counts, reported total
+  hints, duplicate rejection, and empty-page completion. Large events use acknowledged ordered chunks;
+  logging failures are surfaced, not silently ignored. See the README's API
+  diagnostics section for reconstruction, credential exclusions, and privacy
+  precautions. The sanitized API probe and `host.log` remain separate.
 
 ### 6.4 Full reconciliation
 This runs when the user chooses **Full re-sync**, or automatically every N incremental runs (default: weekly):

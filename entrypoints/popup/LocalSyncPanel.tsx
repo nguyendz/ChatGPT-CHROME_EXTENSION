@@ -271,7 +271,7 @@ export function LocalSyncPanel() {
       </div>
       <p className="min-h-4 break-all text-xs text-[#4B5563]" role="status" aria-live="polite">{feedback}</p>
       {syncProgress && <div className="rounded-md border border-[#C6F0E5] bg-[#E7F2E8]/45 p-2 text-xs text-[#215145]" role="status" aria-live="polite">
-        <p className="font-bold">{syncProgress.phase === 'listing' ? 'Reading conversation list' : 'Syncing conversations'}{syncProgress.total === null ? '...' : ` (${syncProgress.listed}/${syncProgress.total})`}</p>
+        <p className="font-bold">{syncProgress.phase === 'listing' ? 'Reading conversation list' : 'Syncing conversations'}{syncProgress.total === null ? ` (${syncProgress.listed} read)` : ` (${syncProgress.listed}/${syncProgress.total})`}</p>
         <p>{syncProgress.selected === null ? 'Latest-chat selection pending' : `${syncProgress.selected} selected`}; processed {syncProgress.processed}; new chats {syncProgress.new}; new messages {syncProgress.newMessages}; updated {syncProgress.updated}; unchanged {syncProgress.unchanged}; failed {syncProgress.failed}.</p>
       </div>}
       <details id="local-sync-details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className="rounded-lg border border-[#C6F0E5] bg-white p-3 text-xs text-[#215145]">

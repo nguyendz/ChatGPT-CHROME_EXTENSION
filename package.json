@@ -12,6 +12,10 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "viewer:build": "vite build --config local-app/viewer/vite.config.ts",
+    "viewer": "node --disable-warning=ExperimentalWarning local-app/viewer/server.ts",
+    "test:viewer": "node --test tests/local-app/viewer*.test.mjs",
+    "test:viewer:browser": "node tests/local-app/viewer.browser.mjs",
     "test:local-sync": "node --test tests/local-app/*.test.mjs",
     "postinstall": "wxt prepare"
   },
@@ -35,6 +39,7 @@
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "typescript": "^5.9.3",
+    "vite": "^8.0.16",
     "wxt": "^0.20.26"
   },
   "pnpm": {

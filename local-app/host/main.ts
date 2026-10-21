@@ -9,7 +9,7 @@ async function main() {
   const base = process.env.CHATGPT_SYNC_DATA_DIR ??
     (process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'ChatGPTBackup') : undefined);
   if (!base) throw new Error('LOCALAPPDATA or CHATGPT_SYNC_DATA_DIR must be set');
-  configureLogging(base);
+  const writeApiDebug = configureLogging(base);
   const expected = process.env.CHATGPT_SYNC_ALLOWED_ORIGIN ??
     readFileSync(new URL('./allowed-origin.txt', import.meta.url), 'utf8').trim();
   if (!/^chrome-extension:\/\/[a-p]{32}\/$/.test(expected) || process.argv[2] !== expected) {
@@ -34,7 +34,7 @@ async function main() {
       await writeFrame(process.stdout, handleRequest(request, () => {
         database ??= openDatabase(base);
         return database;
-      }));
+      }, writeApiDebug));
     }
   } finally {
     database?.close();

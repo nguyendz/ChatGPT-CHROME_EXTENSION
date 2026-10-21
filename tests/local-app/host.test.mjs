@@ -10,7 +10,7 @@ import { Readable, Writable } from 'node:stream';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { readFrames, writeFrame } from '../../local-app/host/framing.ts';
-import { ECHO_BYTES, MAX_EXT_TO_HOST_BYTES, MAX_HOST_TO_EXT_BYTES } from '../../lib/sync/protocol.ts';
+import { API_DEBUG_CHUNK_CHARS, ECHO_BYTES, MAX_EXT_TO_HOST_BYTES, MAX_HOST_TO_EXT_BYTES } from '../../lib/sync/protocol.ts';
 
 const origin = `chrome-extension://${'a'.repeat(32)}/`;
 const main = fileURLToPath(new URL('../../local-app/host/main.ts', import.meta.url));
@@ -114,7 +114,7 @@ test('API probe writes only a validated sanitized report to host.log', async t =
 test('failed sync runs log aggregate categories without chat IDs or error text', async t => {
   const privateConversationId = 'private-chat-identifier';
   const privateError = 'Could not read a complete conversation list. private response body';
-  const unstableError = 'The conversation list kept changing during both consistency scans.';
+  const unstableError = 'Both consistency scans returned duplicate conversation IDs. Retry when the list is stable.';
   const { values, directory, code } = await run(t, [
     frame(request('beginRun', {
       runId: 'failed-run', mode: 'incremental',
@@ -141,6 +141,42 @@ test('failed sync runs log aggregate categories without chat IDs or error text',
   assert.equal(failureEntry.includes('another-private-chat'), false);
   assert.equal(failureEntry.includes(privateError), false);
   assert.equal(failureEntry.includes(unstableError), false);
+});
+
+test('API debug chunks persist separately without leaking bodies to host.log or stdout', async t => {
+  const event = JSON.stringify({ kind: 'response', body: 'private chat\n'.repeat(3000) });
+  const parts = Math.ceil(event.length / API_DEBUG_CHUNK_CHARS);
+  const chunks = Array.from({ length: parts }, (_, part) => ({
+    runId: 'debug-run', entryId: 'entry-1', part, parts,
+    data: event.slice(part * API_DEBUG_CHUNK_CHARS, (part + 1) * API_DEBUG_CHUNK_CHARS),
+  }));
+  const { values, directory, code } = await run(t, [
+    ...chunks.map(chunk => frame(request('recordApiDebug', chunk, `part-${chunk.part}`))),
+    frame(request('recordApiDebug', { ...chunks[0], data: 'x'.repeat(API_DEBUG_CHUNK_CHARS + 1) }, 'too-large')),
+  ]);
+  assert.equal(code, 0);
+  assert.deepEqual(values.slice(0, parts).map(value => value.payload),
+    chunks.map(chunk => ({ entryId: chunk.entryId, part: chunk.part, logged: true })));
+  assert.equal(values.at(-1).payload.code, 'INVALID_PAYLOAD');
+  const entries = readFileSync(join(directory, 'logs', 'api-debug.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(entries.length, parts);
+  assert.equal(entries.map(entry => entry.data).join(''), event);
+  assert.ok(entries.every(entry => entry.runId === 'debug-run' && Number.isFinite(Date.parse(entry.timestamp))));
+  assert.equal(readFileSync(join(directory, 'logs', 'host.log'), 'utf8').includes('private chat'), false);
+  assert.equal(JSON.stringify(values).includes('private chat'), false);
+  assert.throws(() => readFileSync(join(directory, 'sync.db')), { code: 'ENOENT' });
+});
+
+test('API debug disk failures return LOG_ERROR rather than a successful acknowledgement', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'chatgpt-debug-failure-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(join(directory, 'logs', 'api-debug.jsonl'), { recursive: true });
+  const { values, code } = await run(t, [frame(request('recordApiDebug', {
+    runId: 'run-1', entryId: 'entry-1', part: 0, parts: 1, data: '{}',
+  }))], { directory });
+  assert.equal(code, 0);
+  assert.equal(values[0].type, 'error');
+  assert.equal(values[0].payload.code, 'LOG_ERROR');
 });
 
 test('split header, split body, multiple frames per chunk', async () => {

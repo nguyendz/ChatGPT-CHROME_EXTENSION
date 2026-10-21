@@ -5,6 +5,8 @@ import {
 } from '../chatgpt-client.ts';
 import type { ChatGptConversationListItem, ChatGptConversationListPage } from '../chatgpt-client.ts';
 import { HostClient, HostConnectionError } from './host-client.ts';
+import { ApiDebugLogError, createApiDebugLogger } from './api-debug.ts';
+import type { ApiDebugLogger } from './api-debug.ts';
 import type { AccountScope, RequestPayloads, ResponsePayloads } from './protocol.ts';
 
 type HostRequester = Pick<HostClient, 'request' | 'retain'>;
@@ -60,6 +62,7 @@ function isAbortError(error: unknown) {
 }
 
 function conversationListFailureMessage(error: unknown) {
+  if (error instanceof ApiDebugLogError) return error.message;
   if (error instanceof ChatGptApiError) {
     if (error.status === 401) return 'ChatGPT sign-in expired (HTTP 401). Sign in and retry.';
     if (error.status === 403) return 'ChatGPT denied the conversation-list request (HTTP 403).';
@@ -73,12 +76,13 @@ function conversationListFailureMessage(error: unknown) {
     return `ChatGPT returned an invalid conversation-list response${error.status === undefined ? '' : ` (HTTP ${error.status})`}.`;
   }
   if (error instanceof Error && error.message.startsWith('Conversation list changed while paging')) {
-    return 'The conversation list kept changing during both consistency scans. Retry when the list is stable.';
+    return 'Both consistency scans returned duplicate conversation IDs. Retry when the list is stable.';
   }
   return 'Could not fetch a complete conversation list due to a network or response error. Check your connection and retry.';
 }
 
 function isRetryableConversationListFailure(error: unknown) {
+  if (error instanceof ApiDebugLogError) return false;
   if (!(error instanceof ChatGptApiError) || error.status === undefined) return true;
   return error.status === 429 || error.status >= 500;
 }
@@ -90,30 +94,35 @@ function throwIfAborted(signal?: AbortSignal) {
 async function enumerateConversations(
   fetchPage: NonNullable<AllChatSyncDependencies['fetchPage']>,
   signal: AbortSignal | undefined,
-  onPage: (listed: number, total: number) => void,
+  onPage: (listed: number) => void,
+  logApi: ApiDebugLogger,
 ): Promise<ChatGptConversationListItem[]> {
   for (let scan = 0; scan < 2; scan++) {
     throwIfAborted(signal);
     const items: ChatGptConversationListItem[] = [];
     const ids = new Set<string>();
     let offset = 0;
-    let total: number | undefined;
     let unstable = false;
+    onPage(0);
+    await logApi({ kind: 'pagination', scan: scan + 1, offset, reason: 'start' });
 
-    do {
+    while (true) {
       throwIfAborted(signal);
       const page = await fetchPage(offset, CONVERSATION_LIST_PAGE_SIZE, signal);
-      if (total === undefined) total = page.total;
-      else if (page.total !== total) {
-        unstable = true;
-        break;
-      }
-      if (page.items.length === 0 && offset < total) {
-        unstable = true;
-        break;
+      const pageContext = {
+        kind: 'pagination' as const, scan: scan + 1, offset,
+        returned: page.items.length, pageTotal: page.total,
+        listed: items.length,
+      };
+      await logApi({ ...pageContext, reason: 'page' });
+      // Observed totals grow with the offset; confirm the end with an empty page.
+      if (page.items.length === 0) {
+        await logApi({ ...pageContext, reason: 'complete' });
+        return items;
       }
       for (const item of page.items) {
         if (ids.has(item.id)) {
+          await logApi({ ...pageContext, reason: 'duplicate-id', listed: items.length });
           unstable = true;
           break;
         }
@@ -122,16 +131,10 @@ async function enumerateConversations(
       }
       if (unstable) break;
       offset += page.items.length;
-      onPage(offset, total);
-      if (offset > total) {
-        unstable = true;
-        break;
-      }
-    } while (offset < (total ?? 0));
-
-    if (!unstable && total !== undefined && offset === total && items.length === total) return items;
+      onPage(offset);
+    }
   }
-  throw new Error('Conversation list changed while paging; no complete scan could be confirmed.');
+  throw new Error('Conversation list changed while paging; duplicate conversation IDs prevented a complete scan.');
 }
 
 export function selectLatestConversations(
@@ -182,13 +185,14 @@ export async function syncAllConversations(
   dependencies: AllChatSyncDependencies = {},
 ): Promise<AllChatSyncResult> {
   const client = dependencies.client ?? new HostClient();
+  const runId = crypto.randomUUID();
+  const logApi = createApiDebugLogger(client, runId);
   const signal = dependencies.signal;
   const fetchPage = dependencies.fetchPage ??
-    ((offset, limit, requestSignal) => fetchConversationListPage(token, offset, limit, requestSignal));
+    ((offset, limit, requestSignal) => fetchConversationListPage(token, offset, limit, requestSignal, logApi));
   const fetchRaw = dependencies.fetchRaw ??
-    ((conversationId, requestSignal) => fetchConversation(token, conversationId, 5, 1, requestSignal));
+    ((conversationId, requestSignal) => fetchConversation(token, conversationId, 5, 1, requestSignal, logApi));
   const onProgress = dependencies.onProgress ?? (() => {});
-  const runId = crypto.randomUUID();
   const releaseHost = client.retain();
   const failures: SyncFailure[] = [];
   const progress: AllChatSyncProgress = {
@@ -230,11 +234,11 @@ export async function syncAllConversations(
 
     let manifest: ChatGptConversationListItem[] | undefined;
     try {
-      manifest = await enumerateConversations(fetchPage, signal, (listed, total) => {
+      manifest = await enumerateConversations(fetchPage, signal, listed => {
         progress.listed = listed;
-        progress.total = total;
+        progress.total = null;
         report('listing');
-      });
+      }, logApi);
       progress.listed = manifest.length;
       progress.total = manifest.length;
       report('syncing');

@@ -20,6 +20,7 @@ function fakeHost(failType, upsertStatus = 'inserted', changeKind) {
     async request(type, payload) {
       sent.push({ type, payload });
       if (type === failType) throw new Error(`synthetic ${type} failure`);
+      if (type === 'recordApiDebug') return { entryId: payload.entryId, part: payload.part, logged: true };
       if (type === 'upsertConversation') {
         return {
           conversationId: payload.conversationId, status: upsertStatus, messageCount: 1,
@@ -93,6 +94,20 @@ test('single-chat flow records fetch failures and surfaces the original error', 
   );
   assert.deepEqual(host.sent.map(request => request.type), ['beginRun', 'endRun']);
   assert.equal(host.sent[1].payload.failures[0].error, 'Single-chat fetch or persistence failed.');
+});
+
+test('single-chat fetch receives a persistent debug logger correlated with its run', async () => {
+  const host = fakeHost();
+  await syncCurrentConversation('chat-1', account, async logApi => {
+    await logApi({
+      kind: 'response', url: 'https://chatgpt.com/backend-api/conversation/chat-1',
+      status: 200, attempt: 1, body: JSON.stringify(conversation),
+    });
+    return conversation;
+  }, host);
+  const chunk = host.sent.find(request => request.type === 'recordApiDebug').payload;
+  assert.equal(chunk.runId, host.sent[0].payload.runId);
+  assert.equal(JSON.parse(chunk.data).body, JSON.stringify(conversation));
 });
 
 test('single-chat flow reports all upsert statuses and finalizes persistence failures', async () => {

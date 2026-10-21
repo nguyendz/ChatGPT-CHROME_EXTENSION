@@ -5,6 +5,11 @@ export const MAX_HOST_TO_EXT_BYTES = 1_000_000;
 export const MAX_EXT_TO_HOST_BYTES = 64 * 1024 * 1024;
 export const ECHO_BYTES = 10 * 1024 * 1024;
 export const MAX_API_PROBE_REPORT_BYTES = 16 * 1024;
+export const API_DEBUG_CHUNK_CHARS = 16 * 1024;
+
+export type ApiDebugChunk = {
+  runId: string; entryId: string; part: number; parts: number; data: string;
+};
 
 export type ErrorCode = 'PROTOCOL_MISMATCH' | 'BUSY' | 'INVALID_PAYLOAD' |
   'UNKNOWN_TYPE' | 'TOO_LARGE' | 'DB_ERROR' | 'DISK_FULL' |
@@ -47,6 +52,7 @@ export type RequestPayloads = {
   hello: { protocolVersion: number; extVersion: string };
   getStatus: Record<string, never>;
   recordApiProbe: ApiProbeReport;
+  recordApiDebug: ApiDebugChunk;
   beginRun: { runId: string; mode: 'single' | 'incremental'; account: AccountScope };
   diffManifest: {
     runId: string;
@@ -82,6 +88,7 @@ export type ResponsePayloads = {
   hello: HostStatus;
   getStatus: HostStatus;
   recordApiProbe: { probeId: string; logged: true };
+  recordApiDebug: { entryId: string; part: number; logged: true };
   beginRun: { runId: string; accountId: string };
   diffManifest: {
     listed: number;
@@ -135,6 +142,16 @@ function hasExactKeys(value: Record<string, unknown>, expected: string[]): boole
   return Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));
 }
 
+export function isApiDebugChunk(value: unknown): value is ApiDebugChunk {
+  return isRecord(value) && hasExactKeys(value, ['runId', 'entryId', 'part', 'parts', 'data']) &&
+    typeof value.runId === 'string' && /^[a-zA-Z0-9-]{1,128}$/.test(value.runId) &&
+    typeof value.entryId === 'string' && /^[a-zA-Z0-9-]{1,128}$/.test(value.entryId) &&
+    typeof value.part === 'number' && Number.isSafeInteger(value.part) && value.part >= 0 &&
+    typeof value.parts === 'number' && Number.isSafeInteger(value.parts) &&
+    value.parts > value.part && typeof value.data === 'string' &&
+    value.data.length > 0 && value.data.length <= API_DEBUG_CHUNK_CHARS;
+}
+
 const apiProbeJsonTypes: ApiProbeJsonType[] = ['null', 'boolean', 'number', 'string', 'array', 'object'];
 const apiProbeStatuses: ApiProbeStatus[] = ['ok', 'partial', 'http-error', 'network-error', 'invalid-response', 'skipped'];
 const apiProbeErrors: ApiProbeErrorCategory[] = [
@@ -186,6 +203,10 @@ export function isResponsePayload<K extends keyof ResponsePayloads>(
   if (type === 'hello' || type === 'getStatus') return isHostStatus(value);
   if (type === 'recordApiProbe') return isRecord(value) && hasExactKeys(value, ['probeId', 'logged']) &&
     typeof value.probeId === 'string' && value.logged === true;
+  if (type === 'recordApiDebug') return isRecord(value) &&
+    hasExactKeys(value, ['entryId', 'part', 'logged']) &&
+    typeof value.entryId === 'string' && typeof value.part === 'number' &&
+    Number.isSafeInteger(value.part) && value.part >= 0 && value.logged === true;
   if (!isRecord(value)) return false;
   if (type === 'echo') return typeof value.bytes === 'number' && typeof value.sha256 === 'string';
   if (type === 'beginRun') return typeof value.runId === 'string' && typeof value.accountId === 'string';

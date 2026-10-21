@@ -1,4 +1,6 @@
 import { HostClient } from './host-client.ts';
+import { createApiDebugLogger } from './api-debug.ts';
+import type { ApiDebugLogger } from './api-debug.ts';
 import type { ChatGptRawConversation } from '../chatgpt-parse.ts';
 import type { AccountScope, RequestPayloads, ResponsePayloads } from './protocol.ts';
 
@@ -54,7 +56,7 @@ async function finishFailedRun(
 export async function syncCurrentConversation(
   conversationId: string,
   account: AccountScope,
-  fetchRaw: () => Promise<ChatGptRawConversation>,
+  fetchRaw: (logApi: ApiDebugLogger) => Promise<ChatGptRawConversation>,
   client: HostRequester = new HostClient(),
 ): Promise<SingleChatSyncResult> {
   const runId = crypto.randomUUID();
@@ -65,7 +67,7 @@ export async function syncCurrentConversation(
 
     let raw: ChatGptRawConversation;
     try {
-      raw = await fetchRaw();
+      raw = await fetchRaw(createApiDebugLogger(client, runId));
       if (raw.conversation_id !== conversationId) {
         throw new Error('ChatGPT returned a different conversation than the active tab.');
       }

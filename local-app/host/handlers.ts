@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { HOST_VERSION, PROTOCOL_VERSION, isApiProbeReport, isRecord } from '../../lib/sync/protocol.ts';
+import { HOST_VERSION, PROTOCOL_VERSION, isApiDebugChunk, isApiProbeReport, isRecord } from '../../lib/sync/protocol.ts';
 import { HostOperationError, type HostDatabase } from './db.ts';
-import type { AccountScope, ErrorCode, HostResponse, ResponsePayloads } from '../../lib/sync/protocol.ts';
+import type { AccountScope, ApiDebugChunk, ErrorCode, HostResponse, ResponsePayloads } from '../../lib/sync/protocol.ts';
 
 export function errorResponse(id: string, code: ErrorCode, message: string): HostResponse {
   return { v: 1, id, type: 'error', payload: { code, message, retryable: false } };
@@ -36,7 +36,9 @@ function operationError(id: string, error: unknown): HostResponse {
   return errorResponse(id, 'DB_ERROR', 'Cannot complete the local sync operation. See host.log.');
 }
 
-export function handleRequest(value: unknown, database: () => HostDatabase): HostResponse {
+export function handleRequest(
+  value: unknown, database: () => HostDatabase, writeApiDebug: (chunk: ApiDebugChunk) => void,
+): HostResponse {
   const id = isRecord(value) && typeof value.id === 'string' ? value.id.slice(0, 128) : '';
   if (!isRecord(value) || !id || value.id !== id || typeof value.type !== 'string' || !isRecord(value.payload)) {
     return errorResponse(id, 'INVALID_PAYLOAD', 'Expected an envelope with id, type and object payload');
@@ -75,6 +77,17 @@ export function handleRequest(value: unknown, database: () => HostDatabase): Hos
       return success(id, type, { probeId: payload.probeId, logged: true });
     } catch {
       return errorResponse(id, 'LOG_ERROR', 'Could not write the API probe report to host.log.');
+    }
+  }
+  if (type === 'recordApiDebug') {
+    if (!isApiDebugChunk(payload)) {
+      return errorResponse(id, 'INVALID_PAYLOAD', 'recordApiDebug requires a bounded debug-log chunk.');
+    }
+    try {
+      writeApiDebug(payload);
+      return success(id, type, { entryId: payload.entryId, part: payload.part, logged: true });
+    } catch {
+      return errorResponse(id, 'LOG_ERROR', 'Could not write api-debug.jsonl. Check disk space and directory permissions.');
     }
   }
   if (type === 'beginRun') {
