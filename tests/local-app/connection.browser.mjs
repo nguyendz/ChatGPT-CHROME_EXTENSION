@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const directory = await mkdtemp(join(tmpdir(), 'chatgpt-sync-browser-'));
+const dataDirectory = join(directory, 'archive');
 const output = resolve('.output', 'chrome-mv3');
 const expectedId = (await readFile(resolve('.local', 'extension-id.txt'), 'utf8')).trim();
 const browserPath = process.env.CHROMIUM_PATH ?? join(process.env.ProgramFiles, 'Google', 'Chrome', 'Application', 'chrome.exe');
@@ -14,7 +15,7 @@ const browser = spawn(browserPath, [
   '--headless=new', '--no-first-run', '--no-default-browser-check',
   '--enable-unsafe-extension-debugging', '--remote-debugging-port=0',
   `--user-data-dir=${directory}`, 'about:blank',
-], { stdio: ['ignore', 'ignore', 'pipe'] });
+], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, CHATGPT_SYNC_DATA_DIR: dataDirectory } });
 const closed = once(browser, 'close');
 closed.catch(() => {});
 let ws;
@@ -99,15 +100,17 @@ try {
   const status = await evaluate("chrome.runtime.sendMessage({message:'syncHostStatus'})");
   assert.equal(status.state, 'connected', JSON.stringify(status));
   assert.equal(await evaluate('chrome.runtime.getManifest().permissions.includes("downloads")'), false);
-  assert.equal(status.host.schemaVersion, 3);
-  assert.equal(status.host.hostVersion, '0.4.0');
+  assert.equal(status.host.schemaVersion, 4);
+  assert.equal(status.host.hostVersion, '0.5.0');
   assert.equal(status.host.capabilities.includes('message-change-counts'), true);
+  assert.equal(status.host.capabilities.includes('project-catalog'), true);
+  assert.equal(status.host.dbPath, join(dataDirectory, 'sync.db'));
   await evaluate(`document.querySelector('details details').open = true; [...document.querySelectorAll('button')].find(b => b.textContent === 'Echo 10 MB').click()`);
   await until('document.body.innerText.includes("10 MB verified.")');
   assert.equal(await evaluate('!![...document.querySelectorAll("button")].find(b => b.textContent === "Probe ChatGPT API")'), true);
   assert.equal(await evaluate('!![...document.querySelectorAll("button")].find(b => b.textContent.includes("Download"))'), false);
   assert.equal(await evaluate('!![...document.querySelectorAll("button")].find(b => b.textContent === "Sync this chat")'), true);
-  await evaluate(`globalThis.syncProgressPort = (() => {
+  await evaluate(`globalThis.makeSyncProgressPort = () => {
     const messages = [], disconnects = [];
     return {
       sent: [],
@@ -117,11 +120,16 @@ try {
       emit(message) { for (const listener of messages) listener(message); },
       disconnect() { for (const listener of disconnects) listener(); },
     };
-  })();
+  };
+  globalThis.syncProgressPort = globalThis.makeSyncProgressPort();
   chrome.runtime.connect = () => globalThis.syncProgressPort;
   [...document.querySelectorAll('button')].find(b => b.textContent === 'Sync latest 10 chats').click()`);
   assert.deepEqual(await evaluate('globalThis.syncProgressPort.sent'), [{ type: 'start', scope: 'latest-10' }]);
   await until('!![...document.querySelectorAll("button")].find(b => b.textContent === "Stop sync")');
+  await evaluate(`globalThis.syncProgressPort.emit({type:'progress',progress:{
+    phase:'projects',listed:0,total:null,selected:null,processed:0,new:0,newMessages:0,updated:0,unchanged:0,failed:0
+  }})`);
+  await until('document.body.innerText.includes("Syncing project information")');
   await evaluate(`globalThis.syncProgressPort.emit({type:'progress',progress:{
     phase:'listing',listed:1,total:2,selected:null,processed:0,new:0,newMessages:0,updated:0,unchanged:0,failed:0
   }})`);
@@ -129,10 +137,22 @@ try {
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Stop sync').click()`);
   assert.equal(await evaluate('globalThis.syncProgressPort.sent.some(message => message.type === "cancel")'), true);
   await evaluate(`globalThis.syncProgressPort.emit({type:'complete',result:{
-    runId:'test-run',status:'cancelled',
+    runId:'test-run',status:'cancelled',projects:{status:'completed',count:7},
     counts:{listed:2,selected:2,new:1,newMessages:3,updated:0,unchanged:0,failed:0}
   }})`);
   await until('document.body.innerText.includes("All-chat sync stopped: 2 chats selected; 1 new chat, 3 new messages")');
+  assert.equal(await evaluate('document.body.innerText.includes("Project information: 7 saved.")'), true);
+  await evaluate(`globalThis.syncProgressPort = globalThis.makeSyncProgressPort();
+    [...document.querySelectorAll('button')].find(b => b.textContent === 'Sync latest 10 chats').click()`);
+  await until('!![...document.querySelectorAll("button")].find(b => b.textContent === "Stop sync")');
+  await evaluate(`globalThis.syncProgressPort.emit({type:'complete',result:{
+    runId:'metadata-failure',status:'failed',failurePhase:'projects',
+    projects:{status:'failed',category:'pagination-unverified'},
+    error:'Project continuation is unverified; previous metadata retained.',
+    counts:{listed:1,selected:1,new:0,newMessages:0,updated:0,unchanged:1,failed:0}
+  }})`);
+  await until('document.body.innerText.includes("Project information: failed (pagination-unverified)")');
+  assert.equal(await evaluate('document.body.innerText.includes("All-chat sync finished with failures")'), true);
   await evaluate(`chrome.runtime.sendMessage = () => new Promise(resolve => { globalThis.finishApiProbe = resolve; });
     [...document.querySelectorAll('button')].find(b => b.textContent === 'Probe ChatGPT API').click()`);
   await until('document.body.innerText.includes("Probing ChatGPT API...")');
@@ -170,7 +190,7 @@ try {
   await command('Target.closeTarget', { targetId });
   // Wait beyond the background client's idle timeout and verify its host actually stopped.
   await new Promise(resolveWait => setTimeout(resolveWait, 32_000));
-  const log = await readFile(join(process.env.LOCALAPPDATA, 'ChatGPTBackup', 'logs', 'host.log'), 'utf8');
+  const log = await readFile(join(dataDirectory, 'logs', 'host.log'), 'utf8');
   const lastStart = [...log.matchAll(/Host started (\d+)/g)].at(-1)?.[1];
   assert.ok(lastStart);
   assert.match(log, new RegExp(`Host stopped ${lastStart}(?:\\r?\\n|$)`));

@@ -24,7 +24,13 @@ The extension does not persist the ChatGPT access token. It is held in
 service-worker memory only while making ChatGPT requests and is never sent to
 the local host.
 
-Sync debugging additionally stores full conversation-list and conversation-detail
+Wave 4A stores an account-scoped project catalog locally, including the original
+sidebar items. This can include project names, descriptions/instructions,
+author/sharing/permission metadata, file references, and conversation previews.
+Only names/basic information are exposed in the normal viewer. No project
+files or icon URLs are fetched; preview data does not replace saved chats.
+
+Sync debugging additionally stores full project-sidebar, conversation-list and conversation-detail
 response bodies, request URLs, HTTP status/attempt information, network errors,
 and pagination decisions in `logs\api-debug.jsonl` under the same local data
 directory. This includes private chat titles, IDs, messages, and metadata,
@@ -56,7 +62,9 @@ chat content, account identifiers, and the launch token; only the explicit
 startup URL printed to the user's terminal contains the token.
 
 The extension makes requests to `https://chatgpt.com/*` to read the current
-session and conversation after a user action. Conversation data is sent only
+session, sidebar project metadata, conversation list and details after a user action.
+Project sync verifies the session before and after its metadata fetch; session
+responses are never captured in the debug log. Archive data is sent only
 over Native Messaging to the user's local host.
 
 ## Permissions
@@ -68,7 +76,8 @@ over Native Messaging to the user's local host.
 ## User control
 
 Sync and API diagnostics run only when started by the user from the extension
-popup. All-chat, project, and automatic sync are not currently available.
+popup. Latest-10/All-chats sync includes project metadata. Complete project-chat
+enumeration, archived reconciliation, and automatic/live sync are not enabled.
 Conversation file downloads and exports are not provided.
 
 ## Contact and support

@@ -1,0 +1,2876 @@
+{
+    "items": [
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-69a0a2d918cc81918cf174050e9441b2-ai-in-sdlc",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "AI in SDLC",
+                        "description": "",
+                        "prompt_starters": null,
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-02-26T19:45:29.096969+00:00",
+                    "updated_at": "2026-02-26T19:45:31.593840+00:00",
+                    "last_interacted_at": "2026-10-15T23:58:45.662375+00:00",
+                    "num_interactions": 155,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-02-26T19:45:29.695874+00:00",
+                    "version_updated_at": "2026-02-26T19:45:31.306868+00:00",
+                    "live_version": 1,
+                    "training_disabled": null,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": null,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "6acfe00a-a38c-83ec-a2d2-d868d786bfc8",
+                        "title": "AI Agent Work Limits",
+                        "create_time": "2026-10-14T20:03:23.083605Z",
+                        "update_time": "2026-10-15T23:58:40.664573Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "gizmo_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6acd585f-b8b4-83ec-9d7b-034b182c1db0",
+                        "title": "Agent Governance Architecture",
+                        "create_time": "2026-10-12T22:00:00.529301Z",
+                        "update_time": "2026-10-13T10:06:19.641292Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "gizmo_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6abf0056-4ef8-83ec-90ee-1e263d8dfca0",
+                        "title": "AI Coding Skill Loss",
+                        "create_time": "2026-10-02T00:52:38.678409Z",
+                        "update_time": "2026-10-02T01:15:28.268323Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "gizmo_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6abed1ff-4300-83ec-abaf-efd6e1416814",
+                        "title": "Solution Architecture Keywords",
+                        "create_time": "2026-10-01T21:34:55.715136Z",
+                        "update_time": "2026-10-01T21:39:07.591460Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "gizmo_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6abec1b0-eb0c-83ec-8937-d3d6cbe5f73d",
+                        "title": "Transcribe Handwritten Note",
+                        "create_time": "2026-10-01T20:25:21.309540Z",
+                        "update_time": "2026-10-01T21:21:22.372733Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "gizmo_id": "g-p-69a0a2d918cc81918cf174050e9441b2",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": "K1JJRDp-QlAwT0FOQ0xIYmVLVEQ4QUFHQmZBQT09I1JUOjEjVFJDOjUjUlREOmxaRGtWTmZtdnlnL3FnRXdzU2RROFFVM09tSXhZak5sWldKbk1qRTVORE0xWXpKbU9HYzRaenBrTVRSa01XVTBNZ0FGTnpwaU1XSXpaV1ZpWnpJeE9UUXpOV015Wmpobk9HYzZaREUwWkRGbE5ESUFCVkZ6Y0d0bVpIVlZjRVJ3YjNkbWMzUmlkV3B3YndBRCtzek96TWpSemM3UnpzMnF6TTNFek0zRXpNelF5OGZNeDh2TDA4N094TTdPLy9ySW5aeVptODJjenRHWm5NNmIwY2JMbVp2UnhzWEx4OUdheTVySW01eVp5WmpIeTVyLyNJU1Y6MiNJRU86NjU1OTkjUUNGOjgjQ0lEOjI="
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402-house",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "House",
+                        "description": "",
+                        "prompt_starters": [],
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-09-06T06:39:15.656424+00:00",
+                    "updated_at": "2026-09-06T06:39:15.834398+00:00",
+                    "last_interacted_at": "2026-10-04T23:55:18.344055+00:00",
+                    "num_interactions": 57,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-09-06T06:39:15.660425+00:00",
+                    "version_updated_at": "2026-09-06T06:39:15.817336+00:00",
+                    "live_version": 1,
+                    "training_disabled": false,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": true,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "6ac195e7-11e4-83ec-96f0-4c209f8753f0",
+                        "title": "Household Spending Research",
+                        "create_time": "2026-10-03T23:55:19.721022Z",
+                        "update_time": "2026-10-04T23:55:15.045227Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "gizmo_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6abc4c01-d86c-83ec-8dcf-0a0995583fb4",
+                        "title": "Prefab wall construction",
+                        "create_time": "2026-09-29T23:38:42.604339Z",
+                        "update_time": "2026-09-29T23:45:41.790911Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "gizmo_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6ab33b77-d218-83ec-86f8-926961ae78e3",
+                        "title": "Comparing Migration Mobility",
+                        "create_time": "2026-09-23T02:37:44.700484Z",
+                        "update_time": "2026-09-23T02:38:09.103434Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "gizmo_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6ab23df9-3a04-83ec-befe-0e83a07c77b1",
+                        "title": "House Lifespan Comparison",
+                        "create_time": "2026-09-22T08:36:12.198664Z",
+                        "update_time": "2026-09-22T10:16:55.529316Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "gizmo_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6aa51690-8860-83ec-9243-cd7c45950e6c",
+                        "title": "Australia’s Lost Capability",
+                        "create_time": "2026-09-12T09:08:33.840863Z",
+                        "update_time": "2026-09-17T11:07:14.707793Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "gizmo_id": "g-p-6a9d0a9350fc8191a8b71ff6ab6fd402",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": "K1JJRDp-ZVo1eEFPbDBka2RrVGpNQUFMQnVDUT09I1JUOjEjVFJDOjUjUlREOmxaRGtWTmZtdnlnL3FnRXdzU2RROFFVM1lqcGxNV0k2TnpNMVltUTVORE14T2pRNU9EUm5OV1kwWW1Wak9qYzVPQUFGTjJJNlpURmlPamN6TldKa09UUXpNVG8wT1RnMFp6Vm1OR0psWXpvM09UZ0FCVkZ6Y0d0bVpIVlZjRVJ3YjNkbWMzUmlkV3B3YndBRCtzek96TWpSenNYUnpjZXF6YzNFenNmRXpjclF4ODdIeDhYTDA4N094TTdPLy9ySW5aM0p6Y2pGenRIR3hzak8wY2JMbVp2Unhjekt5OUdibXNlYnlzbkZ5YzZaeUp2LyNJU1Y6MiNJRU86NjU1OTkjUUNGOjgjQ0lEOjI="
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-6a9645ab731481919dd50c7de7e648f8-ai-agent-data-grounding",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "AI Agent data grounding",
+                        "description": "",
+                        "prompt_starters": [],
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-09-01T03:25:31.466123+00:00",
+                    "updated_at": "2026-09-01T03:25:31.629781+00:00",
+                    "last_interacted_at": "2026-10-02T07:22:58.287364+00:00",
+                    "num_interactions": 86,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-09-01T03:25:31.468188+00:00",
+                    "version_updated_at": "2026-09-01T03:25:31.622492+00:00",
+                    "live_version": 1,
+                    "training_disabled": false,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": true,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "6abf1629-513c-83ec-a9aa-c7979a580a77",
+                        "title": "Jev Workflow Integration",
+                        "create_time": "2026-10-02T02:25:46.159597Z",
+                        "update_time": "2026-10-02T07:22:56.029061Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "gizmo_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6ab70815-ab2c-83ec-8261-8c2afd8e336b",
+                        "title": "Workflow Runner Keywords",
+                        "create_time": "2026-09-25T23:47:35.981960Z",
+                        "update_time": "2026-09-29T07:59:18.450642Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "gizmo_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6ab5b025-9434-83ec-ac36-3dc38146746a",
+                        "title": "Measurability Of Importance",
+                        "create_time": "2026-09-24T23:20:06.116521Z",
+                        "update_time": "2026-09-24T23:21:04.620198Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "gizmo_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6aadd99b-aa00-83ec-b908-6edec3cd4fd7",
+                        "title": "Agent Staff Memory Architecture",
+                        "create_time": "2026-09-19T00:38:52.474289Z",
+                        "update_time": "2026-09-20T00:14:17.704323Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "gizmo_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6aaefff1-f08c-83ec-99a9-9af6be2136ec",
+                        "title": "Design Agent Task Systems",
+                        "create_time": "2026-09-19T21:34:42.495538Z",
+                        "update_time": "2026-09-19T22:35:55.037147Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "gizmo_id": "g-p-6a9645ab731481919dd50c7de7e648f8",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": "K1JJRDp-end3SkFOWkR1aGJRS3o4QUFDRFhCZz09I1JUOjEjVFJDOjUjUlREOmxaRGtWTmZtdnlnL3FnRXdzU2RROFFVM1lqbzNOVFppWldjMFpqVTVORE0wT1RKall6UTVOakZpT0RsbU1qVTZZd0FGTjJJNk56VTJZbVZuTkdZMU9UUXpORGt5WTJNME9UWXhZamc1WmpJMU9tTUFCVkZ6Y0d0bVpIVlZjRVJ3YjNkbWMzUmlkV3B3YndBRCtzek96TWpSenNYUnpjV3F6TXpFeThuRXljblF6c3ZIemNySDA4N094TTdPLy9ySW5aMlptSmlZemRHWXpzYWIwY2JMbVp2UnhjV2R4ZEhGblpqSW5Kbk16Y3ZJbVp2LyNJU1Y6MiNJRU86NjU1OTkjUUNGOjgjQ0lEOjI="
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-6a7c3c04b0888191b8dbceb9d48d4989-investment-platform",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "Investment platform",
+                        "description": "",
+                        "prompt_starters": [],
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-08-12T09:25:24.712957+00:00",
+                    "updated_at": "2026-08-12T09:25:25.185141+00:00",
+                    "last_interacted_at": "2026-09-14T07:03:11.923987+00:00",
+                    "num_interactions": 36,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-08-12T09:25:24.718610+00:00",
+                    "version_updated_at": "2026-08-12T09:25:25.187028+00:00",
+                    "live_version": 1,
+                    "training_disabled": false,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": true,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "6aa708bb-0b9c-83ec-bec6-213143336edb",
+                        "title": "Brainstorm Investment Keywords",
+                        "create_time": "2026-09-13T20:34:04.242975Z",
+                        "update_time": "2026-09-14T07:02:55.405562Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "gizmo_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6aa706b7-b338-83ec-b766-3905e93bb45a",
+                        "title": "AI Tax Regulation Mapping",
+                        "create_time": "2026-09-13T20:25:28.527151Z",
+                        "update_time": "2026-09-13T20:31:11.661704Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "gizmo_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6aa3b725-1ca4-83ec-8714-1e5cedb37657",
+                        "title": "Pension Payment Architecture",
+                        "create_time": "2026-09-11T08:09:09.931387Z",
+                        "update_time": "2026-09-11T08:15:45.366471Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "gizmo_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6a93d769-f758-83ec-ad17-e6244946d06f",
+                        "title": "Investment Platform Delegation",
+                        "create_time": "2026-08-30T07:14:38.489043Z",
+                        "update_time": "2026-08-30T07:20:28.372886Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "gizmo_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6a860360-4a4c-83ec-ae18-0d20132203c7",
+                        "title": "Request Validation Workflow",
+                        "create_time": "2026-08-19T19:26:25.168595Z",
+                        "update_time": "2026-08-19T19:30:14.088432Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "gizmo_id": "g-p-6a7c3c04b0888191b8dbceb9d48d4989",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": false,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": "K1JJRDp-QlAwT0FOQ0xIYmU1elRzQUFPQjdCQT09I1JUOjEjVFJDOjUjUlREOmxaRGtWTmZtdnlnL3FnRXdzU2RROFFVM1lqaGtOR1F4T0RWblpqVTVORE0xT2pvMFpHVmlNV2RqTW1Kalp6ZzNPZ0FGTjJJNFpEUmtNVGcxWjJZMU9UUXpOVG82TkdSbFlqRm5ZekppWTJjNE56b0FCVkZ6Y0d0bVpIVlZjRVJ3YjNkbWMzUmlkV3B3YndBRCtzek96TWpSenNiUnpjV3F6Y1hFeTg3RXpjclF6c2JHeXN2TTA4N094TTdPLy9ySW5jYkl6c3ZJenRIS25jcWIwY2JMbVp2Um5abk54dEhPbXN6T3pjdk16TTdMbThmLyNJU1Y6MiNJRU86NjU1OTkjUUNGOjgjQ0lEOjI="
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-69a0f778080c8191adcc5186aa482dee",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-69a0f778080c8191adcc5186aa482dee-kinh-te",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "Kinh tế",
+                        "description": "",
+                        "prompt_starters": null,
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-02-27T01:46:32.031560+00:00",
+                    "updated_at": "2026-02-27T01:46:34.958740+00:00",
+                    "last_interacted_at": "2026-03-06T00:27:12.559857+00:00",
+                    "num_interactions": 80,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-02-27T01:46:32.816131+00:00",
+                    "version_updated_at": "2026-02-27T01:46:34.717423+00:00",
+                    "live_version": 1,
+                    "training_disabled": null,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": null,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "69a0f77e-5544-8324-9819-513b7ceb45e9",
+                        "title": "Motivation and the Australian Dream",
+                        "create_time": "2026-02-27T01:46:43.052566Z",
+                        "update_time": "2026-03-06T00:27:09.989329Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a0f778080c8191adcc5186aa482dee",
+                        "gizmo_id": "g-p-69a0f778080c8191adcc5186aa482dee",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": null
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-69a097588ec08191a2534a616e45b476",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-69a097588ec08191a2534a616e45b476-tho",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "Thơ",
+                        "description": "",
+                        "prompt_starters": null,
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-02-26T18:56:24.557703+00:00",
+                    "updated_at": "2026-02-26T18:56:26.911198+00:00",
+                    "last_interacted_at": "2026-02-26T22:17:04.710283+00:00",
+                    "num_interactions": 4,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-02-26T18:56:25.180141+00:00",
+                    "version_updated_at": "2026-02-26T18:56:26.712368+00:00",
+                    "live_version": 1,
+                    "training_disabled": null,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": null,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "69a0c5c9-df98-8324-ab88-a5f18721618e",
+                        "title": "Phân tích bài thơ",
+                        "create_time": "2026-02-26T22:14:48.245548Z",
+                        "update_time": "2026-02-26T22:17:03.691951Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "gizmo_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "69890827-9834-8322-936a-2fa554ccf0d9",
+                        "title": "Nhận xét và góp ý thơ",
+                        "create_time": "2026-02-08T22:03:20.942036Z",
+                        "update_time": "2026-02-26T18:58:12.320746Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "gizmo_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "698ef94f-47b0-8398-b2e1-b1ab627014db",
+                        "title": "Bình thơ yêu cuồng nhiệt",
+                        "create_time": "2026-02-13T10:13:46.127698Z",
+                        "update_time": "2026-02-26T18:57:56.660262Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "gizmo_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6990cdbe-d9e8-8323-889d-4ad6a763a59f",
+                        "title": "New chat",
+                        "create_time": "2026-02-14T19:33:13.653385Z",
+                        "update_time": "2026-02-26T18:57:47.184088Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "gizmo_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "6990cd52-1c78-8322-b899-f7afa78bce4a",
+                        "title": "Cảm nhận bài thơ",
+                        "create_time": "2026-02-14T19:30:52.378095Z",
+                        "update_time": "2026-02-26T18:57:31.234986Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "gizmo_id": "g-p-69a097588ec08191a2534a616e45b476",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": "K1JJRDp-TkVvSkFOazJ4Yy1Kd3dZQUFBRFFCUT09I1JUOjEjVFJDOjUjUlREOmxaRGtWTmZtdnlnL3FnRXdzU2RROFFVM09tSXhPamcyWkdObVp6azVORHBpWXprME9tVTVPVEU0TVRZMU9XSmxNUUFGTnpwaU1UbzRObVJqWm1jNU9UUTZZbU01TkRwbE9Ua3hPREUyTlRsaVpURUFCVkZ6Y0d0bVpIVlZjRVJ3YjNkbWMzUmlkV3B3YndBRCtzek96TWpSenN6UnpNaXF6Y2JFeWNmRXk4M1F6TXZLeGNiSTA4N094TTdPLy9ySXhjWE9tNXJKek5ITm04ZkcwY2JMek16Um5NYkZ4ZEdZeDUyWW5jZkduSnVaeXAzLyNJU1Y6MiNJRU86NjU1OTkjUUNGOjgjQ0lEOjI="
+            }
+        },
+        {
+            "gizmo": {
+                "gizmo": {
+                    "id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                    "organization_id": "org-ivY5020FhmN1Lr67zVvQ0ggj",
+                    "short_url": "g-p-699fdc6b2b408191861ccf2ed48c4852-tri-tue-va-triet-hoc",
+                    "author": {
+                        "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                        "user_email": "nguyendz@gmail.com",
+                        "display_name": "Nguyen Ngo",
+                        "link_to": null,
+                        "is_verified": false,
+                        "selected_display": "name",
+                        "will_receive_support_emails": false,
+                        "display_socials": []
+                    },
+                    "voice": {
+                        "id": "ember"
+                    },
+                    "workspace_id": null,
+                    "model": null,
+                    "default_model": null,
+                    "instructions": "",
+                    "display": {
+                        "name": "Trí tuệ và triết học",
+                        "description": "",
+                        "prompt_starters": null,
+                        "profile_pic_id": null,
+                        "profile_picture_url": null,
+                        "categories": [],
+                        "emoji": null,
+                        "theme": null
+                    },
+                    "share_recipient": "private",
+                    "created_at": "2026-02-26T05:38:51.169027+00:00",
+                    "updated_at": "2026-02-26T05:38:55.156006+00:00",
+                    "last_interacted_at": "2026-02-26T15:25:25.606357+00:00",
+                    "num_interactions": 21,
+                    "tags": [
+                        "unreviewable",
+                        "private"
+                    ],
+                    "is_unassigned": false,
+                    "version": 1,
+                    "version_author": null,
+                    "version_created_at": "2026-02-26T05:38:51.920886+00:00",
+                    "version_updated_at": "2026-02-26T05:38:54.916217+00:00",
+                    "live_version": 1,
+                    "training_disabled": null,
+                    "sharing_targets": [
+                        {
+                            "recipient": "private",
+                            "allowed": true,
+                            "moderated_fields": null
+                        },
+                        {
+                            "recipient": "link",
+                            "allowed": true,
+                            "moderated_fields": null
+                        }
+                    ],
+                    "appeal_info": null,
+                    "vanity_metrics": {
+                        "num_conversations": null,
+                        "num_conversations_str": null,
+                        "created_ago_str": null,
+                        "review_stats": null
+                    },
+                    "workspace_approval_date": null,
+                    "workspace_approved": null,
+                    "sharing": {
+                        "subjects": [],
+                        "recipient": "private"
+                    },
+                    "current_user_permission": {
+                        "can_delete": true,
+                        "can_export": true,
+                        "can_read": true,
+                        "can_write": true,
+                        "can_share": true,
+                        "can_view_config": true
+                    },
+                    "gizmo_type": "snorlax",
+                    "context_stuffing_budget": 16384,
+                    "use_injest_path": null,
+                    "conversation_copy_in_progress": false,
+                    "gizmo_snorlax_type": null,
+                    "archived_at": null,
+                    "is_archived": false,
+                    "memory_enabled": true,
+                    "memory_scope": "global",
+                    "goal": null
+                },
+                "tools": [],
+                "files": [],
+                "product_features": {
+                    "attachments": {
+                        "type": "retrieval",
+                        "accepted_mime_types": [
+                            "application/x-powershell",
+                            "text/x-julia",
+                            "text/x-python",
+                            "text/x-ruby",
+                            "application/msword",
+                            "text/xml",
+                            "text/x-lua",
+                            "text/markdown",
+                            "text/x-pug",
+                            "application/vnd.apple.keynote",
+                            "text/x-c",
+                            "application/haansofthwpx",
+                            "text/x-handlebars",
+                            "text/javascript",
+                            "text/jsx",
+                            "application/toml",
+                            "text/x-haskell",
+                            "text/x-dart",
+                            "text/x-c++",
+                            "text/x-erlang",
+                            "text/x-shellscript",
+                            "application/x-scala",
+                            "text/html",
+                            "text/x-vcard",
+                            "text/x-tex",
+                            "application/x-sql",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "text/rtf",
+                            "text/x-tmpl",
+                            "text/x-swift",
+                            "text/x-scala",
+                            "application/vnd.hancom.hwpx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "text/x-ejs",
+                            "text/x-objectivec++",
+                            "application/vnd.apple.pages",
+                            "text/x-java",
+                            "text/x-elixir",
+                            "application/x-hwp-v5",
+                            "application/rtf",
+                            "application/haansofthwp",
+                            "text/x-clojure",
+                            "application/x-yaml",
+                            "text/x-perl",
+                            "text/x-script.python",
+                            "application/hwp+zip",
+                            "application/x-hwp",
+                            "text/x-kotlin",
+                            "text/x-astro",
+                            "application/json",
+                            "text/x-jade",
+                            "text/x-rust",
+                            "text/calendar",
+                            "text/x-lisp",
+                            "text/x-liquid",
+                            "text/x-asm",
+                            "text/x-twig",
+                            "text/x-makefile",
+                            "text/plain",
+                            "application/vnd.ms-powerpoint",
+                            "text/vbscript",
+                            "text/x-erb",
+                            "text/x-sh",
+                            "text/x-diff",
+                            "text/x-php",
+                            "application/x-hwp+zip",
+                            "application/vnd.oasis.opendocument.text",
+                            "text/x-objectivec",
+                            "text/x-rst",
+                            "text/tsx",
+                            "text/x-typescript",
+                            "text/x-mustache",
+                            "text/x-groovy",
+                            "text/css",
+                            "text/x-r",
+                            "text/x-csharp",
+                            "application/javascript",
+                            "application/x-rust",
+                            "application/pdf",
+                            "message/rfc822",
+                            "text/x-jinja2",
+                            "text/x-go"
+                        ],
+                        "can_accept_all_mime_types": true,
+                        "image_mime_types": [
+                            "image/gif",
+                            "image/png",
+                            "image/jpeg",
+                            "image/webp"
+                        ]
+                    },
+                    "contextual_answers": null
+                },
+                "has_tpp_conversation": false,
+                "project_file_limits": null,
+                "project_connector_scope_limits": null
+            },
+            "conversations": {
+                "items": [
+                    {
+                        "id": "6726ab65-8d38-8009-95f3-8d1aad50d4f4",
+                        "title": "Free Time Benefits Creativity",
+                        "create_time": "2024-11-02T22:44:53.682614Z",
+                        "update_time": "2026-02-26T19:12:15.792237Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "gizmo_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": null,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "679d778d-2278-8009-afc4-e54d6b71c69a",
+                        "title": "Purpose of Life Explained",
+                        "create_time": "2025-02-01T01:23:25.536401Z",
+                        "update_time": "2026-02-26T18:54:45.580266Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "gizmo_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": null,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "69a065c2-4a98-8320-847f-98e279c4dadf",
+                        "title": "Khái niệm chém gió",
+                        "create_time": "2026-02-26T15:24:50.604083Z",
+                        "update_time": "2026-02-26T15:25:24.313397Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "gizmo_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "69a01f2b-c424-8323-b4fd-fe831ce1f49e",
+                        "title": "AI Agent IDE Vision",
+                        "create_time": "2026-02-26T10:23:41.157839Z",
+                        "update_time": "2026-02-26T15:10:45.237829Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "gizmo_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    },
+                    {
+                        "id": "699f5a2e-1cf4-8323-b2bc-ced48a834e23",
+                        "title": "Cải thiện trí tuệ nhân tạo",
+                        "create_time": "2026-02-25T20:24:23.650000Z",
+                        "update_time": "2026-02-26T10:19:26.491512Z",
+                        "latest_assistant_turn_created_at": null,
+                        "pinned_time": null,
+                        "mapping": null,
+                        "current_node": null,
+                        "conversation_template_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "gizmo_id": "g-p-699fdc6b2b408191861ccf2ed48c4852",
+                        "is_archived": false,
+                        "is_starred": null,
+                        "is_temporary_chat": null,
+                        "is_do_not_remember": false,
+                        "memory_scope": "global_enabled",
+                        "context_scopes": null,
+                        "context_scopes_v2": {
+                            "context_scopes": [
+                                {
+                                    "is_siloed": false,
+                                    "scope_namespace": "global",
+                                    "sub_scope": null,
+                                    "key": null,
+                                    "key_timestamp": null,
+                                    "key_scoped_access_claim": null
+                                }
+                            ]
+                        },
+                        "workspace_id": null,
+                        "async_status": null,
+                        "safe_urls": [],
+                        "blocked_urls": [],
+                        "conversation_origin": null,
+                        "trial_conversation_type": null,
+                        "is_automation_conversation": false,
+                        "snippet": null,
+                        "summary_metadata": null,
+                        "sugar_item_id": null,
+                        "sugar_item_visible": false,
+                        "owner": {
+                            "user_id": "user-ONhtZooAhCfETnDcxycDL4zj",
+                            "user_email": "nguyendz@gmail.com",
+                            "name": "Nguyen Ngo",
+                            "avatar_url": "https://s.gravatar.com/avatar/41c75fef8fdd00fb46f6f5892f60b608?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fng.png"
+                        }
+                    }
+                ],
+                "cursor": null
+            }
+        }
+    ],
+    "cursor": null
+}

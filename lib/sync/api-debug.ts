@@ -2,11 +2,12 @@ import { API_DEBUG_CHUNK_CHARS } from './protocol.ts';
 import type { HostClient } from './host-client.ts';
 
 export type ApiDebugEvent =
+  | { kind: 'project-pagination'; scan: number; page: number; reason: 'page' | 'unstable' | 'complete'; returned?: number }
   | { kind: 'response'; url: string; attempt: number; status: number; body: string }
   | { kind: 'network-error'; url: string; attempt: number; error: string }
   | {
     kind: 'pagination'; scan: number; offset: number;
-    reason: 'start' | 'page' | 'duplicate-id' | 'complete';
+    reason: 'start' | 'page' | 'duplicate-id' | 'complete' | 'validation-limit';
     returned?: number; pageTotal?: number; listed?: number;
   };
 

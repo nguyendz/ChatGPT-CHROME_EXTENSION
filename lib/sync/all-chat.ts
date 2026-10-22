@@ -1,13 +1,16 @@
 import type { ChatGptRawConversation } from '../chatgpt-parse.ts';
 import {
   ChatGptApiError, CONVERSATION_LIST_PAGE_SIZE, fetchConversation,
-  fetchConversationListPage,
+  fetchConversationListPage, fetchProjectSidebarPage, verifyChatGptScope,
 } from '../chatgpt-client.ts';
 import type { ChatGptConversationListItem, ChatGptConversationListPage } from '../chatgpt-client.ts';
 import { HostClient, HostConnectionError } from './host-client.ts';
 import { ApiDebugLogError, createApiDebugLogger } from './api-debug.ts';
 import type { ApiDebugLogger } from './api-debug.ts';
 import type { AccountScope, RequestPayloads, ResponsePayloads } from './protocol.ts';
+import type { ProjectSyncOutcome } from './protocol.ts';
+import type { ProjectSidebarPage } from '../project-catalog.ts';
+import { collectProjectCatalog, projectFailure } from './projects.ts';
 
 type HostRequester = Pick<HostClient, 'request' | 'retain'>;
 type SyncFailure = {
@@ -17,7 +20,7 @@ type SyncFailure = {
 };
 
 export type AllChatSyncProgress = {
-  phase: 'listing' | 'syncing';
+  phase: 'projects' | 'listing' | 'syncing';
   listed: number;
   total: number | null;
   selected: number | null;
@@ -27,6 +30,7 @@ export type AllChatSyncProgress = {
   updated: number;
   unchanged: number;
   failed: number;
+  projects?: ProjectSyncOutcome;
 };
 
 export type AllChatSyncResult = {
@@ -37,7 +41,8 @@ export type AllChatSyncResult = {
     updated: number; unchanged: number; failed: number;
   };
   error?: string;
-  failurePhase?: 'listing' | 'selection' | 'syncing';
+  failurePhase?: 'projects' | 'listing' | 'selection' | 'syncing';
+  projects?: ProjectSyncOutcome;
 };
 
 export type AllChatSyncDependencies = {
@@ -49,6 +54,8 @@ export type AllChatSyncDependencies = {
   signal?: AbortSignal;
   onProgress?: (progress: AllChatSyncProgress) => void;
   maxConversations?: number;
+  fetchProjects?: (cursor: string | null, signal?: AbortSignal) => Promise<ProjectSidebarPage>;
+  verifyScope?: (account: AccountScope, token: string, signal?: AbortSignal) => Promise<void>;
 };
 
 function abortError() {
@@ -96,7 +103,26 @@ async function enumerateConversations(
   signal: AbortSignal | undefined,
   onPage: (listed: number) => void,
   logApi: ApiDebugLogger,
+  validationLimit?: number,
 ): Promise<ChatGptConversationListItem[]> {
+  if (validationLimit !== undefined) {
+    throwIfAborted(signal);
+    onPage(0);
+    await logApi({ kind: 'pagination', scan: 1, offset: 0, reason: 'start' });
+    const page = await fetchPage(0, validationLimit, signal);
+    throwIfAborted(signal);
+    const context = {
+      kind: 'pagination' as const, scan: 1, offset: 0,
+      returned: page.items.length, pageTotal: page.total, listed: page.items.length,
+    };
+    await logApi({ ...context, reason: 'page' });
+    if (page.items.length > validationLimit || new Set(page.items.map(item => item.id)).size !== page.items.length) {
+      throw new ChatGptApiError('ChatGPT returned an oversized or duplicate validation list.');
+    }
+    await logApi({ ...context, reason: 'validation-limit' });
+    onPage(page.items.length);
+    return page.items;
+  }
   for (let scan = 0; scan < 2; scan++) {
     throwIfAborted(signal);
     const items: ChatGptConversationListItem[] = [];
@@ -137,41 +163,6 @@ async function enumerateConversations(
   throw new Error('Conversation list changed while paging; duplicate conversation IDs prevented a complete scan.');
 }
 
-export function selectLatestConversations(
-  items: ChatGptConversationListItem[],
-  limit: number,
-): ChatGptConversationListItem[] {
-  if (!Number.isSafeInteger(limit) || limit < 1) {
-    throw new Error('Latest-chat limit must be a positive safe integer.');
-  }
-  if (items.length <= limit) return items;
-
-  const timestamps = items.map(item => {
-    const token = item.updateTimeToken;
-    if (token?.startsWith('s:')) {
-      const value = Date.parse(token.slice(2));
-      return Number.isFinite(value) ? { kind: 'string', value } : null;
-    }
-    if (token?.startsWith('n:')) {
-      const value = Number(token.slice(2));
-      return Number.isFinite(value) ? { kind: 'number', value } : null;
-    }
-    return null;
-  });
-  const kinds = new Set(timestamps.filter((value): value is NonNullable<typeof value> => value !== null)
-    .map(value => value.kind));
-  if (timestamps.some(value => value === null) || kinds.size !== 1) {
-    throw new Error(
-      `Cannot safely select the ${limit} latest chats because their update_time values are missing, invalid, or mixed. Choose All chats to validate without the latest-chat filter.`,
-    );
-  }
-
-  return items.map((item, index) => ({ item, index, value: timestamps[index]!.value }))
-    .sort((left, right) => right.value - left.value || left.index - right.index)
-    .slice(0, limit)
-    .map(entry => entry.item);
-}
-
 async function digestConversation(raw: ChatGptRawConversation) {
   const rawJson = JSON.stringify(raw);
   if (typeof rawJson !== 'string') throw new Error('Conversation payload is not JSON serializable.');
@@ -184,6 +175,11 @@ export async function syncAllConversations(
   token: string,
   dependencies: AllChatSyncDependencies = {},
 ): Promise<AllChatSyncResult> {
+  if (dependencies.maxConversations !== undefined &&
+    (!Number.isSafeInteger(dependencies.maxConversations) ||
+      dependencies.maxConversations < 1 || dependencies.maxConversations > CONVERSATION_LIST_PAGE_SIZE)) {
+    throw new Error(`Validation limit must be between 1 and ${CONVERSATION_LIST_PAGE_SIZE}.`);
+  }
   const client = dependencies.client ?? new HostClient();
   const runId = crypto.randomUUID();
   const logApi = createApiDebugLogger(client, runId);
@@ -192,6 +188,9 @@ export async function syncAllConversations(
     ((offset, limit, requestSignal) => fetchConversationListPage(token, offset, limit, requestSignal, logApi));
   const fetchRaw = dependencies.fetchRaw ??
     ((conversationId, requestSignal) => fetchConversation(token, conversationId, 5, 1, requestSignal, logApi));
+  const fetchProjects = dependencies.fetchProjects ??
+    ((cursor, requestSignal) => fetchProjectSidebarPage(token, cursor, requestSignal, logApi));
+  const verifyScope = dependencies.verifyScope ?? verifyChatGptScope;
   const onProgress = dependencies.onProgress ?? (() => {});
   const releaseHost = client.retain();
   const failures: SyncFailure[] = [];
@@ -205,6 +204,7 @@ export async function syncAllConversations(
   let selectedCount = 0;
   let runError: string | undefined;
   let failurePhase: AllChatSyncResult['failurePhase'];
+  let projects: ProjectSyncOutcome = { status: 'cancelled', category: 'cancelled' };
 
   function report(phase: AllChatSyncProgress['phase']) {
     progress.phase = phase;
@@ -220,8 +220,9 @@ export async function syncAllConversations(
     }
     const hostStatus = await client.request('getStatus', {});
     if (!hostStatus.capabilities.includes('all-chat-sync') ||
-      !hostStatus.capabilities.includes('message-change-counts') || hostStatus.schemaVersion < 3) {
-      throw new Error('Update the local sync host before using all-chat sync and new-message counts.');
+      !hostStatus.capabilities.includes('message-change-counts') ||
+      !hostStatus.capabilities.includes('project-catalog') || hostStatus.schemaVersion < 4) {
+      throw new Error('Update the local sync host before using all-chat sync with project information (schema 4 required).');
     }
     if (signal?.aborted) {
       return {
@@ -229,19 +230,50 @@ export async function syncAllConversations(
         counts: { listed: 0, selected: 0, new: 0, newMessages: 0, updated: 0, unchanged: 0, failed: 0 },
       };
     }
-    await client.request('beginRun', { runId, mode: 'incremental', account });
+    await client.request('beginRun', { runId, mode: 'incremental', account, projectCatalog: true });
     runStarted = true;
+
+    report('projects');
+    let scopeVerified = false;
+    try {
+      await verifyScope(account, token, signal);
+      scopeVerified = true;
+      const items = await collectProjectCatalog(runId, account, fetchProjects, logApi, signal);
+      scopeVerified = false;
+      await verifyScope(account, token, signal);
+      scopeVerified = true;
+      throwIfAborted(signal);
+      const result = await client.request('commitProjectCatalog', { runId, items });
+      projects = { status: 'completed', count: result.count };
+      if (result.count !== items.length) throw new HostConnectionError('host-exited', 'Inconsistent project catalog acknowledgement.');
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) {
+        cancelled = true;
+      } else {
+        const failure = error instanceof HostConnectionError || error instanceof ApiDebugLogError
+          ? { category: 'local-host' as const, message: error.message }
+          : projectFailure(error);
+        projects = { status: 'failed', category: failure.category };
+        runError = failure.message;
+        failurePhase = 'projects';
+        fatal = !scopeVerified || ['unauthorized', 'account-mismatch', 'local-host'].includes(failure.category);
+      }
+    }
+    progress.projects = projects;
+    report('projects');
 
     let manifest: ChatGptConversationListItem[] | undefined;
     try {
-      manifest = await enumerateConversations(fetchPage, signal, listed => {
-        progress.listed = listed;
-        progress.total = null;
-        report('listing');
-      }, logApi);
-      progress.listed = manifest.length;
-      progress.total = manifest.length;
-      report('syncing');
+      if (!cancelled && !fatal) {
+        manifest = await enumerateConversations(fetchPage, signal, listed => {
+          progress.listed = listed;
+          progress.total = null;
+          report('listing');
+        }, logApi, dependencies.maxConversations);
+        progress.listed = manifest.length;
+        progress.total = manifest.length;
+        report('syncing');
+      }
     } catch (error) {
       if (isAbortError(error) || signal?.aborted) {
         cancelled = true;
@@ -260,9 +292,7 @@ export async function syncAllConversations(
     let selectedManifest: ChatGptConversationListItem[] | undefined;
     if (manifest && !cancelled) {
       try {
-        selectedManifest = dependencies.maxConversations === undefined
-          ? manifest
-          : selectLatestConversations(manifest, dependencies.maxConversations);
+        selectedManifest = manifest;
         selectedCount = selectedManifest.length;
         progress.selected = selectedCount;
         report('syncing');
@@ -370,10 +400,11 @@ export async function syncAllConversations(
     }
 
     cancelled ||= Boolean(signal?.aborted);
-    const summary = await client.request('endRun', { runId, cancelled, failures });
+    const summary = await client.request('endRun', { runId, cancelled, failures, projects });
     return {
       runId,
       status: summary.status,
+      projects,
       counts: {
         listed: progress.listed, selected: selectedCount,
         new: summary.counts.new, newMessages: progress.newMessages,
@@ -398,6 +429,7 @@ export async function syncAllConversations(
       const summary = await client.request('endRun', {
         runId,
         cancelled: shouldCancel,
+        projects,
         failures: shouldCancel ? failures : [...failures, {
           conversationId: null,
           error: 'All-chat sync could not be completed.',
@@ -407,6 +439,7 @@ export async function syncAllConversations(
       return {
         runId,
         status: summary.status,
+        projects,
         counts: {
           listed: progress.listed, selected: selectedCount,
           new: summary.counts.new,
@@ -416,7 +449,7 @@ export async function syncAllConversations(
           failed: summary.counts.failed,
         },
         ...(!shouldCancel ? {
-          error: 'All-chat sync could not be completed.',
+          error: runError ?? 'All-chat sync could not be completed.',
           failurePhase: failurePhase ?? 'syncing',
         } : {}),
       };

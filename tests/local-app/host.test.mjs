@@ -223,14 +223,14 @@ test('hello bootstraps persistent WAL database; reconnect does not repeat migrat
   const first = await run(t, [hello], { directory });
   const second = await run(t, [hello, frame(request('getStatus'))], { directory });
   assert.equal(first.code, 0);
-  assert.equal(second.values[1].payload.schemaVersion, 3);
+  assert.equal(second.values[1].payload.schemaVersion, 4);
   assert.equal(first.values[0].payload.installId, second.values[0].payload.installId);
   const db = new DatabaseSync(join(directory, 'sync.db'));
   try {
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 3);
-    assert.equal(db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map(row => row.version).join(','), '1,2,3');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 4);
+    assert.equal(db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map(row => row.version).join(','), '1,2,3,4');
     assert.equal(db.prepare('PRAGMA journal_mode').get().journal_mode, 'wal');
-    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.4.0');
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.5.0');
   } finally { db.close(); }
 });
 
@@ -251,12 +251,12 @@ test('schema migrations upgrade a version 1 database without replacing metadata'
 
   const { values, code } = await run(t, [frame(request('hello', { protocolVersion: 1, extVersion: 'test' }))], { directory });
   assert.equal(code, 0);
-  assert.equal(values[0].payload.schemaVersion, 3);
+  assert.equal(values[0].payload.schemaVersion, 4);
   const migrated = new DatabaseSync(dbPath);
   try {
     assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'install_id'").get().value, 'preserved-install');
-    assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.4.0');
-    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 3);
+    assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.5.0');
+    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 4);
     assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM accounts').get().n, 0);
     assert.equal(
       migrated.prepare('PRAGMA table_info(conversations)').all().some(column => column.name === 'list_update_token'),

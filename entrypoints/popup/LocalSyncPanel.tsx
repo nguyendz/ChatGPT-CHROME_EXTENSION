@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ConnectionStatus, EchoResult } from '@/lib/sync/protocol';
+import { isProjectSyncOutcome } from '@/lib/sync/protocol';
 import type { SingleChatSyncResult } from '@/lib/sync/single-chat';
 import type { AllChatSyncProgress, AllChatSyncResult } from '@/lib/sync/all-chat';
 
@@ -28,11 +29,12 @@ function isCount(value: unknown): value is number {
 }
 
 function isProgress(value: unknown): value is AllChatSyncProgress {
-  return isRecord(value) && (value.phase === 'listing' || value.phase === 'syncing') &&
+  return isRecord(value) && (value.phase === 'projects' || value.phase === 'listing' || value.phase === 'syncing') &&
     isCount(value.listed) && (value.total === null || isCount(value.total)) &&
     (value.selected === null || isCount(value.selected)) &&
     isCount(value.processed) && isCount(value.new) && isCount(value.newMessages) &&
-    isCount(value.updated) && isCount(value.unchanged) && isCount(value.failed);
+    isCount(value.updated) && isCount(value.unchanged) && isCount(value.failed) &&
+    (value.projects === undefined || isProjectSyncOutcome(value.projects));
 }
 
 function isRunResult(value: unknown): value is AllChatSyncResult {
@@ -43,8 +45,10 @@ function isRunResult(value: unknown): value is AllChatSyncResult {
     isCount(value.counts.new) && isCount(value.counts.newMessages) &&
     isCount(value.counts.updated) && isCount(value.counts.unchanged) &&
     isCount(value.counts.failed) && (value.error === undefined || typeof value.error === 'string') &&
+    (value.projects === undefined || isProjectSyncOutcome(value.projects)) &&
     (value.failurePhase === undefined ||
-      value.failurePhase === 'listing' || value.failurePhase === 'selection' || value.failurePhase === 'syncing');
+      value.failurePhase === 'projects' || value.failurePhase === 'listing' ||
+      value.failurePhase === 'selection' || value.failurePhase === 'syncing');
 }
 
 export function LocalSyncPanel() {
@@ -142,7 +146,8 @@ export function LocalSyncPanel() {
         setStopRequested(false);
         const { counts } = raw.result;
         setSyncProgress({
-          phase: raw.result.failurePhase === 'listing' ? 'listing' : 'syncing',
+          phase: raw.result.failurePhase === 'projects' ? 'projects' :
+            raw.result.failurePhase === 'listing' ? 'listing' : 'syncing',
           listed: counts.listed,
           total: counts.listed,
           selected: counts.selected,
@@ -152,6 +157,7 @@ export function LocalSyncPanel() {
           updated: counts.updated,
           unchanged: counts.unchanged,
           failed: counts.failed,
+          projects: raw.result.projects,
         });
         const outcome = raw.result.status === 'completed' ? 'completed' :
           raw.result.status === 'cancelled' ? 'stopped' : 'finished with failures';
@@ -164,10 +170,13 @@ export function LocalSyncPanel() {
           ? ' Failed conversations will be retried on the next run.'
           : '';
         const errorHint = raw.result.error ? ` ${raw.result.error}` : '';
+        const projectHint = raw.result.projects?.status === 'completed'
+          ? ` Project information: ${raw.result.projects.count} saved.`
+          : raw.result.projects ? ` Project information: ${raw.result.projects.status} (${raw.result.projects.category}).` : '';
         const logHint = raw.result.status === 'failed'
           ? ' See sanitized SYNC_RUN_FAILURE details in %LOCALAPPDATA%\\ChatGPTBackup\\logs\\host.log.'
           : '';
-        setFeedback(`All-chat sync ${outcome}: ${selectedSummary}; ${newChatSummary}, ${newMessageSummary}, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.failed} failed.${retryHint}${errorHint}${logHint}`);
+        setFeedback(`All-chat sync ${outcome}: ${selectedSummary}; ${newChatSummary}, ${newMessageSummary}, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.failed} failed.${projectHint}${retryHint}${errorHint}${logHint}`);
         port.disconnect();
         return;
       }
@@ -257,7 +266,7 @@ export function LocalSyncPanel() {
           <option value="all">All chats</option>
         </select>
         <p className="text-xs text-[#4B5563]">
-          Validation mode reads the full list to identify the 10 most recently updated chats, then syncs only those details.
+          Validation mode requests only the first 10 list entries, without paging. ChatGPT ordering is unverified; these may not be the account-wide latest 10. Project information still syncs.
         </p>
       </div>
       <div className="flex gap-3">
@@ -271,8 +280,10 @@ export function LocalSyncPanel() {
       </div>
       <p className="min-h-4 break-all text-xs text-[#4B5563]" role="status" aria-live="polite">{feedback}</p>
       {syncProgress && <div className="rounded-md border border-[#C6F0E5] bg-[#E7F2E8]/45 p-2 text-xs text-[#215145]" role="status" aria-live="polite">
-        <p className="font-bold">{syncProgress.phase === 'listing' ? 'Reading conversation list' : 'Syncing conversations'}{syncProgress.total === null ? ` (${syncProgress.listed} read)` : ` (${syncProgress.listed}/${syncProgress.total})`}</p>
-        <p>{syncProgress.selected === null ? 'Latest-chat selection pending' : `${syncProgress.selected} selected`}; processed {syncProgress.processed}; new chats {syncProgress.new}; new messages {syncProgress.newMessages}; updated {syncProgress.updated}; unchanged {syncProgress.unchanged}; failed {syncProgress.failed}.</p>
+        <p className="font-bold">{syncProgress.phase === 'projects' ? 'Syncing project information' :
+          syncProgress.phase === 'listing' ? 'Reading conversation list' : 'Syncing conversations'}{syncProgress.phase !== 'projects' &&
+          (syncProgress.total === null ? ` (${syncProgress.listed} read)` : ` (${syncProgress.listed}/${syncProgress.total})`)}</p>
+        <p>{syncProgress.selected === null ? 'Chat selection pending' : `${syncProgress.selected} selected`}; processed {syncProgress.processed}; new chats {syncProgress.new}; new messages {syncProgress.newMessages}; updated {syncProgress.updated}; unchanged {syncProgress.unchanged}; failed {syncProgress.failed}.</p>
       </div>}
       <details id="local-sync-details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className="rounded-lg border border-[#C6F0E5] bg-white p-3 text-xs text-[#215145]">
         <summary className="cursor-pointer font-bold">Local sync: {action === 'connection' ? 'Checking...' : action === 'sync-current' ? 'Syncing chat...' : action === 'sync-all' ? 'Syncing all chats...' : status ? labels[status.state] : 'Not tested'}</summary>

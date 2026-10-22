@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ChatGptApiError } from '../../lib/chatgpt-client.ts';
-import { syncAllConversations } from '../../lib/sync/all-chat.ts';
+import { syncAllConversations as runAll } from '../../lib/sync/all-chat.ts';
+import { projectRaw } from '../fixtures/project-catalog.mjs';
+
+function syncAllConversations(account, token, dependencies = {}) {
+  return runAll(account, token, {
+    fetchProjects: async () => ({ items: [], cursor: null }),
+    verifyScope: async () => {},
+    ...dependencies,
+  });
+}
 
 const account = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -41,12 +50,13 @@ function fakeHost() {
         return { entryId: payload.entryId, part: payload.part, logged: true };
       }
       if (type === 'getStatus') {
-        return { schemaVersion: 3, capabilities: ['all-chat-sync', 'message-change-counts'] };
+        return { schemaVersion: 4, capabilities: ['all-chat-sync', 'message-change-counts', 'project-catalog'] };
       }
       if (type === 'beginRun') {
         counts = { listed: 0, new: 0, updated: 0, unchanged: 0, failed: 0 };
         return { runId: payload.runId, accountId: 'account-1' };
       }
+      if (type === 'commitProjectCatalog') return { count: payload.items.length };
       if (type === 'diffManifest') {
         const changed = [];
         let unchanged = 0;
@@ -85,7 +95,7 @@ function fakeHost() {
         counts.failed = payload.failures.length;
         return {
           runId: payload.runId,
-          status: payload.cancelled ? 'cancelled' : payload.failures.length ? 'failed' : 'completed',
+          status: payload.cancelled ? 'cancelled' : payload.failures.length || payload.projects?.status === 'failed' ? 'failed' : 'completed',
           counts: { ...counts },
         };
       }
@@ -98,6 +108,90 @@ function fakeHost() {
 function pageFor(items) {
   return async (offset, limit) => ({ total: items.length, items: items.slice(offset, offset + limit) });
 }
+
+test('project catalog refreshes on chat no-op without increasing selected detail calls', async () => {
+  const host = fakeHost();
+  let name = 'Before rename';
+  const options = {
+    client: host, maxConversations: 10, fetchPage: pageFor([{ id: 'chat-1', updateTimeToken: 'n:1' }]),
+    fetchRaw: async id => makeRaw(id),
+    fetchProjects: async () => ({ items: [projectRaw(undefined, name)], cursor: null }),
+  };
+  await syncAllConversations(account, 'secret', options);
+  name = 'After rename';
+  const result = await syncAllConversations(account, 'secret', options);
+  assert.equal(result.status, 'completed');
+  assert.equal(result.counts.unchanged, 1);
+  assert.deepEqual(result.projects, { status: 'completed', count: 1 });
+  assert.equal(host.sent.filter(x => x.type === 'upsertConversation').length, 1);
+  const commits = host.sent.filter(x => x.type === 'commitProjectCatalog');
+  assert.equal(commits.length, 2);
+  assert.equal(commits[1].payload.items[0].raw.gizmo.gizmo.display.name, name);
+});
+
+test('project failure is explicit without inflating conversation failures or preventing useful chat sync', async () => {
+  const host = fakeHost();
+  const result = await syncAllConversations(account, 'secret', {
+    client: host, fetchPage: pageFor([{ id: 'chat-1', updateTimeToken: 'n:1' }]),
+    fetchRaw: async id => makeRaw(id),
+    fetchProjects: async () => { throw new ChatGptApiError('denied', 403); },
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.counts.new, 1);
+  assert.equal(result.counts.failed, 0);
+  assert.equal(result.failurePhase, 'projects');
+  assert.equal(result.projects.category, 'forbidden');
+  assert.match(result.error, /HTTP 403/);
+  assert.equal(host.sent.some(x => x.type === 'commitProjectCatalog'), false);
+});
+
+test('scope change or expired auth stops conversation work and preserves a visible project failure', async () => {
+  const host = fakeHost();
+  const result = await syncAllConversations(account, 'secret', {
+    client: host, fetchPage: async () => assert.fail('must not list another account'),
+    verifyScope: async () => { throw new ChatGptApiError('expired', 401); },
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.equal(result.projects.category, 'unauthorized');
+  assert.equal(result.counts.failed, 0);
+});
+
+test('loss of identity verification after the sidebar response prevents commit and further chat work', async () => {
+  const host = fakeHost();
+  let checks = 0;
+  const result = await syncAllConversations(account, 'secret', {
+    client: host, fetchProjects: async () => ({ items: [projectRaw()], cursor: null }),
+    verifyScope: async () => { if (++checks === 2) throw new Error('session unavailable'); },
+    fetchPage: async () => assert.fail('unverified account must not continue'),
+  });
+  assert.equal(result.status, 'failed');
+  assert.equal(host.sent.some(x => x.type === 'commitProjectCatalog'), false);
+});
+
+test('Stop during project fetch leaves catalog uncommitted and run cancelled', async () => {
+  const host = fakeHost();
+  const controller = new AbortController();
+  const result = await syncAllConversations(account, 'secret', {
+    client: host, signal: controller.signal,
+    fetchProjects: async () => { controller.abort(); return { items: [], cursor: null }; },
+    fetchPage: async () => assert.fail('must not list after Stop'),
+  });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.projects.status, 'cancelled');
+  assert.equal(host.sent.some(x => x.type === 'commitProjectCatalog'), false);
+});
+
+test('old host is rejected before a run or any API work starts', async () => {
+  const host = fakeHost();
+  const request = host.request;
+  host.request = (type, payload) => type === 'getStatus'
+    ? { schemaVersion: 3, capabilities: ['all-chat-sync', 'message-change-counts'] } : request(type, payload);
+  await assert.rejects(syncAllConversations(account, 'secret', {
+    client: host, fetchProjects: async () => assert.fail(),
+  }), /schema 4 required/);
+  assert.equal(host.sent.some(x => x.type === 'beginRun'), false);
+});
 
 test('first all-chat run stores every listed conversation and never sends the token to the host', async () => {
   const host = fakeHost();
@@ -122,7 +216,7 @@ test('first all-chat run stores every listed conversation and never sends the to
   assert.equal(JSON.stringify(host.sent).includes('Bearer '), false);
 });
 
-test('latest-10 validation mode scans every page and syncs only the most recently updated chats', async () => {
+test('latest-10 validation requests exactly one page of ten and preserves returned order', async () => {
   const host = fakeHost();
   const items = Array.from({ length: 61 }, (_, index) => ({
     id: `chat-${index}`,
@@ -134,7 +228,7 @@ test('latest-10 validation mode scans every page and syncs only the most recentl
     client: host,
     maxConversations: 10,
     fetchPage: async (offset, limit) => {
-      pageOffsets.push(offset);
+      pageOffsets.push({ offset, limit });
       return { total: items.length, items: items.slice(offset, offset + limit) };
     },
     fetchRaw: async id => {
@@ -143,9 +237,9 @@ test('latest-10 validation mode scans every page and syncs only the most recentl
     },
   });
 
-  assert.deepEqual(pageOffsets, [0, 50, 61]);
-  assert.deepEqual(fetched, Array.from({ length: 10 }, (_, index) => `chat-${60 - index}`));
-  assert.equal(result.counts.listed, 61);
+  assert.deepEqual(pageOffsets, [{ offset: 0, limit: 10 }]);
+  assert.deepEqual(fetched, Array.from({ length: 10 }, (_, index) => `chat-${index}`));
+  assert.equal(result.counts.listed, 10);
   assert.equal(result.counts.selected, 10);
   assert.equal(result.counts.new, 10);
   assert.equal(result.counts.newMessages, 10);
@@ -153,11 +247,11 @@ test('latest-10 validation mode scans every page and syncs only the most recentl
     .flatMap(request => request.payload.items).length, 10);
 });
 
-test('latest-10 mode reports when update_time values cannot safely identify recency', async () => {
+test('validation does not require timestamp ordering and missing tokens conservatively fetch details', async () => {
   const host = fakeHost();
   const items = Array.from({ length: 11 }, (_, index) => ({
     id: `chat-${index}`,
-    updateTimeToken: index === 10 ? null : `n:${index}`,
+    updateTimeToken: index % 3 === 0 ? null : index % 3 === 1 ? `n:${index}` : 's:unparseable-time',
   }));
   let fetchCount = 0;
   const result = await syncAllConversations(account, 'synthetic-token', {
@@ -170,12 +264,47 @@ test('latest-10 mode reports when update_time values cannot safely identify rece
     },
   });
 
-  assert.equal(result.status, 'failed');
-  assert.equal(result.counts.selected, 0);
-  assert.equal(result.counts.failed, 1);
-  assert.match(result.error, /update_time values are missing, invalid, or mixed/);
-  assert.equal(fetchCount, 0);
-  assert.equal(host.sent.some(request => request.type === 'diffManifest'), false);
+  assert.equal(result.status, 'completed');
+  assert.equal(result.counts.selected, 10);
+  assert.equal(result.counts.failed, 0);
+  assert.equal(fetchCount, 10);
+});
+
+test('validation never pages after an empty or short first page even with a larger total', async () => {
+  for (const size of [0, 3]) {
+    const host = fakeHost();
+    let calls = 0;
+    const result = await syncAllConversations(account, 'token', {
+      client: host, maxConversations: 10,
+      fetchPage: async (offset, limit) => {
+        assert.equal(++calls, 1);
+        assert.equal(offset, 0);
+        assert.equal(limit, 10);
+        return { total: 1000, items: Array.from({ length: size }, (_, i) => ({ id: `chat-${i}`, updateTimeToken: null })) };
+      },
+      fetchRaw: async id => makeRaw(id),
+    });
+    assert.equal(result.status, 'completed');
+    assert.equal(result.counts.listed, size);
+    assert.equal(result.counts.selected, size);
+    const events = host.sent.filter(request => request.type === 'recordApiDebug').map(request => JSON.parse(request.payload.data));
+    assert.ok(events.some(event => event.reason === 'validation-limit'));
+    assert.ok(!events.some(event => event.kind === 'pagination' && event.reason === 'complete'));
+  }
+});
+
+test('validation rejects duplicate/oversized responses without retrying or syncing any details', async () => {
+  for (const ids of [['duplicate', 'duplicate'], Array.from({ length: 11 }, (_, i) => `chat-${i}`)]) {
+    let calls = 0;
+    const result = await syncAllConversations(account, 'token', {
+      client: fakeHost(), maxConversations: 10,
+      fetchPage: async () => { calls++; return { total: 1000, items: ids.map(id => ({ id, updateTimeToken: null })) }; },
+      fetchRaw: async () => assert.fail('Invalid validation list must not sync details'),
+    });
+    assert.equal(calls, 1);
+    assert.equal(result.status, 'failed');
+    assert.equal(result.failurePhase, 'listing');
+  }
 });
 
 test('conversation-list failures report a safe cause and the failed phase', async () => {
@@ -389,7 +518,7 @@ test('unstable overlapping list pages are retried once before syncing', async ()
   assert.equal(debug.at(-1).reason, 'complete');
 });
 
-test('offset-dependent totals scan through 170 chats to an empty page before latest-10 selection', async () => {
+test('all-chats still scans through 170 chats with offset-dependent totals to an empty page', async () => {
   const host = fakeHost();
   const items = Array.from({ length: 170 }, (_, index) => ({
     id: `chat-${index}`, updateTimeToken: `n:${index}`,
@@ -399,7 +528,6 @@ test('offset-dependent totals scan through 170 chats to an empty page before lat
   const fetched = [];
   const result = await syncAllConversations(account, 'synthetic-token', {
     client: host,
-    maxConversations: 10,
     onProgress: value => progress.push(value),
     fetchPage: async (offset, limit) => {
       offsets.push(offset);
@@ -416,16 +544,16 @@ test('offset-dependent totals scan through 170 chats to an empty page before lat
   assert.equal(result.status, 'completed');
   assert.deepEqual(offsets, [0, 50, 100, 150, 170]);
   assert.equal(result.counts.listed, 170);
-  assert.equal(result.counts.selected, 10);
-  assert.equal(result.counts.new, 10);
+  assert.equal(result.counts.selected, 170);
+  assert.equal(result.counts.new, 170);
   assert.equal(result.counts.failed, 0);
-  assert.deepEqual(fetched, Array.from({ length: 10 }, (_, index) => `chat-${169 - index}`));
+  assert.deepEqual(fetched, Array.from({ length: 170 }, (_, index) => `chat-${index}`));
   const listing = progress.filter(value => value.phase === 'listing');
   assert.ok(listing.every(value => value.total === null));
   assert.deepEqual(listing.map(value => value.listed), [0, 50, 100, 150, 170]);
   assert.ok(progress.filter(value => value.phase === 'syncing').every(value => value.total === 170));
   const pages = host.sent.filter(request => request.type === 'recordApiDebug')
-    .map(request => JSON.parse(request.payload.data)).filter(event => event.reason === 'page');
+    .map(request => JSON.parse(request.payload.data)).filter(event => event.kind === 'pagination' && event.reason === 'page');
   assert.deepEqual(pages.map(event => event.pageTotal), [51, 101, 151, 171, 171]);
   assert.ok(pages.every(event => event.scan === 1));
 });
@@ -443,10 +571,11 @@ test('debug-log failures are explicit and prevent unlogged pagination', async ()
     fetchPage: async () => { fetched = true; return { total: 0, items: [] }; },
   });
   assert.equal(result.status, 'failed');
-  assert.equal(result.failurePhase, 'listing');
+  assert.equal(result.failurePhase, 'projects');
   assert.match(result.error, /Could not write the local API debug log/);
   assert.equal(fetched, false);
-  assert.equal(host.sent.at(-1).payload.failures[0].retryable, false);
+  assert.equal(host.sent.at(-1).payload.projects.category, 'local-host');
+  assert.equal(result.counts.failed, 0);
 });
 
 test('duplicate IDs within or across pages fail both scans before any detail requests', async t => {
@@ -578,4 +707,22 @@ test('default all-chat API adapters send full list and detail diagnostics to the
   assert.deepEqual(events.filter(event => event.kind === 'response').map(event => JSON.parse(event.body)), [list, emptyList, raw]);
   assert.ok(events.some(event => event.reason === 'complete'));
   assert.equal(JSON.stringify(chunks).includes('synthetic-debug-token'), false);
+});
+
+test('production validation adapter sends offset=0&limit=10 once even when total advertises thousands', async t => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  const host = fakeHost();
+  const items = Array.from({ length: 10 }, (_, i) => ({ id: `chat-${i}`, update_time: i }));
+  for (const item of items) host.conversations.set(item.id, { updateTimeToken: `n:${item.update_time}` });
+  const urls = [];
+  globalThis.fetch = async url => {
+    urls.push(String(url));
+    return new Response(JSON.stringify({ items, total: 10000 }));
+  };
+  const result = await syncAllConversations(account, 'token', { client: host, maxConversations: 10 });
+  assert.equal(result.status, 'completed');
+  assert.deepEqual(urls, ['https://chatgpt.com/backend-api/conversations?offset=0&limit=10']);
+  assert.equal(result.counts.listed, 10);
+  assert.equal(result.counts.unchanged, 10);
 });

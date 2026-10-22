@@ -90,7 +90,6 @@ function App() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const transcript = useRef<HTMLElement>(null);
   const detail = detailState?.refresh === refresh && detailState.detail.id === selected ? detailState.detail : null;
-  const activeGroup = groups.find(group => group.id === groupId);
   const conversations = usePages(accountId ? `/api/conversations?accountId=${encodeURIComponent(accountId)}&group=${encodeURIComponent(groupId)}` : null, isConversationPage, refresh);
   const messages = usePages(detail ? `/api/conversations/${encodeURIComponent(detail.id)}/messages?accountId=${encodeURIComponent(accountId)}&revision=${encodeURIComponent(detail.revision)}` : null, isMessagePage, refresh);
 
@@ -181,17 +180,20 @@ function App() {
         <div className="chat-list">
           {groupLoading && <p className="state" role="status">Reading folders...</p>}
           {groupError && <p className="state error" role="alert">{groupError} <button onClick={reload}>Retry</button></p>}
-          {groups.length > 0 && <nav className="folder-list" aria-label="Conversation folders">
-            <p className="folder-heading">Folders</p>
-            {groups.map(group => <button key={group.id} className="folder-item"
-              aria-current={groupId === group.id ? 'true' : undefined} onClick={() => {
-                if (groupId !== group.id) { setGroupId(group.id); setSelected(null); }
-              }}>
-              <span>{group.label}</span><span className="folder-count">{group.conversationCount}</span>
-            </button>)}
-            <p className="folder-note">Project and GPT names are unavailable. These are provisional folders from saved metadata.</p>
-          </nav>}
-          <div className="section-label"><h2>{activeGroup?.label ?? 'Conversations'}</h2><span>{activeGroup?.conversationCount ?? accounts.find(account => account.id === accountId)?.conversationCount ?? 0} saved</span></div>
+          {groups.length > 0 && <div className="folder-picker">
+            <label htmlFor="folder-select">Folder</label>
+            <select id="folder-select" value={groupId} onChange={event => {
+              const nextGroup = event.currentTarget.value;
+              if (groups.some(group => group.id === nextGroup) && groupId !== nextGroup) {
+                setGroupId(nextGroup);
+                setSelected(null);
+              }
+            }}>
+              {groups.map(group => <option key={group.id} value={group.id}>
+                {group.label} ({group.conversationCount})
+              </option>)}
+            </select>
+          </div>}
           {bootstrap.loading && !status && <p className="state" role="status">Opening local archive...</p>}
           {!bootstrap.loading && !bootstrap.error && !accounts.length && <p className="state">No accounts have been synced. Sync a chat in the extension, then refresh.</p>}
           {conversations.error && <p className="state error" role="alert">{conversations.error} <button onClick={reload}>Retry</button></p>}
@@ -200,16 +202,20 @@ function App() {
           <nav aria-label="Conversation list">
             {conversations.items.map(chat => <button className="chat-item" aria-current={selected === chat.id ? 'true' : undefined}
               key={chat.id} onClick={() => setSelected(chat.id)}>
-              <strong>{chat.title?.trim() || 'Untitled conversation'}</strong>
-              <span>Updated {date(chat.updateTime)}</span>
-              <span>{chat.messageCount} stored messages</span>
-              <small>Synced {date(chat.lastSyncedAt)}</small>
+              <strong>{chat.title?.trim() || 'Untitled conversation'} <span className="message-count">({chat.messageCount})</span></strong>
             </button>)}
           </nav>
           {conversations.loading && <p className="state" role="status">Reading conversations...</p>}
           {conversations.cursor && <button className="load-more" onClick={conversations.more} disabled={conversations.loading}>Load more conversations</button>}
         </div>
-        <footer>{status ? `${status.conversations} conversations / ${status.messages} stored messages` : 'Local SQLite archive'}<br />No ChatGPT connection required.</footer>
+        <footer>
+          <div className="sidebar-footer-summary">
+            <span>{status ? `${status.conversations} conversations` : 'Local SQLite archive'}</span>
+            <span>Last sync {status?.lastSyncAt ? date(status.lastSyncAt) : status ? 'Never' : 'Unavailable'}</span>
+          </div>
+          {status && <p>{status.messages} stored messages</p>}
+          <p>No ChatGPT connection required.</p>
+        </footer>
       </aside>
       <main className="reader" ref={transcript} tabIndex={-1}>
         {!selected ? <section className="welcome">

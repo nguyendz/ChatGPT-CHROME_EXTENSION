@@ -6,10 +6,11 @@ database through a Chrome Native Messaging host.
 ## Current behavior
 
 - **Sync latest 10 chats (validation)** is the default scope. The extension
-  scans every conversation-list page, ranks parseable `update_time` values, and
-  fetches details only for the 10 most recently updated chats. Choose **All
-  chats** to sync the full list. Missing or mixed timestamps stop latest-10
-  mode rather than guessing the order.
+  requests one conversation-list page with `offset=0&limit=10` and fetches
+  details for at most those ten entries. It does not page further or rank the
+  complete account history. ChatGPT ordering is unverified, so this is a small
+  validation sample, not guaranteed account-wide latest chats. Choose **All
+  chats** to scan and sync the full list.
 - Every request to ChatGPT is serialized and separated from the preceding
   request by at least two seconds after its response is read.
 - Sync results report new chats and newly added message IDs, along with
@@ -60,16 +61,21 @@ database, migrates its schema, or starts a sync.
 
 - Select an archive account and a conversation to read its active branch.
   Message order follows the saved mapping tree, not timestamps.
-- The sidebar groups saved chats into provisional **Unnamed project** and
-  **Unnamed custom GPT** folders, plus **No project marker**. Unknown marked
+- The sidebar shows saved project names when a project catalog has been synced.
+  Projects without saved names and custom GPTs use provisional **Unnamed project**
+  and **Unnamed custom GPT** labels, plus **No project marker**. Unknown marked
   metadata appears under **Other marked chats**, not as an inferred project.
   **All conversations** preserves the complete account list. Folder counts and
   pagination are account-scoped; switching folders clears the open chat.
 - Project grouping uses conversation-root `gizmo_type = "snorlax"` with a
   `g-p-` gizmo ID; custom GPTs use `gizmo_type = "gpt"` with a `g-` ID.
-  These are observed API conventions, not verified remote project names.
-  No project names are stored, so labels are provisional numbers ordered by
-  saved IDs and may renumber when groups change. Grouping never writes to the DB.
+  These are observed API conventions. Wave 4A stores project names/basic
+  information from the sidebar separately; the catalog does not change saved
+  chat membership. Provisional numbers may renumber when groups change.
+  Saved projects with no local chats show a zero-count folder. Select a named
+  project for its saved description, archive/update information, and freshness.
+  Older saved information is retained when absent from a newer sidebar result.
+  Grouping never writes to the DB.
 - Use **Load more conversations/messages** for longer archives and chats.
 - Use **Refresh archive** to reread saved data. If a sync changes a conversation
   between message pages, choose **Reload conversation** rather than mixing
@@ -90,10 +96,34 @@ database, migrates its schema, or starts a sync.
 - Attachments are not fetched/rendered, and alternate branches are counted but
   not shown. Branch navigation, search, and exports are later Wave 6 milestones.
 
-The viewer currently supports archive schema 3. It reads at most 50 chats or
+The viewer supports archive schemas 3 and 4; schema 3 retains provisional labels
+until the host upgrades the archive on its next connection. It reads at most 50 chats or
 100 messages per default page (maximum 100 / 200), with explicit errors for
 responses over 8 MiB or saved raw conversations over 60 MiB. Content is never
 silently truncated.
+
+### Project information sync (Wave 4A)
+
+Both **Latest 10** and **All chats** first sync sidebar project information;
+renames refresh even when all chat update tokens match. Latest-10 still fetches
+at most ten selected conversation details. Sidebar conversation previews are
+not imported as full chats or used as remote totals.
+
+Reload the built extension and restart the viewer after updating. Host v0.5.0
+owns the transactional schema 3 -> 4 migration; older hosts are rejected before
+an incremental run starts. Existing chats/messages are preserved.
+
+Project sync checks the session user/workspace/token before and after fetching
+metadata and rejects non-null project workspace mismatches. This detects scope
+changes; it does not establish endpoint coverage across every workspace.
+If a root continuation cursor is returned, the unverified continuation request
+fails explicitly and the previous catalog is retained. Useful chat sync can
+continue after a non-auth project failure, but the overall result reports
+failure and shows project status separately from failed-chat counts.
+
+Full project-chat enumeration, archived coverage, missing/deleted reconciliation,
+scheduled/live sync, and a profile chooser remain unimplemented Wave 4B/4C work.
+No deletion or automatic-sync behavior is enabled.
 
 Checks:
 
@@ -118,8 +148,9 @@ entries when sharing probe results. Failed sync runs add a sanitized
 `SYNC_RUN_FAILURE` category summary to the same log; it excludes chat IDs and
 failure text.
 
-All-chat and latest-10 sync read list pages until an empty page confirms the
-end. ChatGPT's `total` can grow with the offset (for example, 51 then 101);
+All-chats sync reads list pages until an empty page confirms the
+end. Validation requests only the first ten entries and logs `validation-limit`
+without claiming full-list completion. ChatGPT's `total` can grow with the offset (for example, 51 then 101);
 it is not treated as an exact count or a consistency check. Short pages do
 not stop listing. Duplicate IDs still trigger one restart, and persistent
 duplicates fail explicitly. Listing progress shows the number read without

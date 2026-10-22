@@ -10,9 +10,9 @@ downloads, exports, an Options page, or the removed backup progress flow.
 
 ## Goal
 
-The popup's primary action defaults to a validation scope that syncs only the
-10 most recently updated chats. It scans the complete list to rank validated
-`update_time` values, then fetches details only for the selected chats. The user
+The popup's primary action defaults to a validation scope that requests only
+the first 10 conversation-list entries (`offset=0&limit=10`) and fetches details
+for at most those entries, without further list paging. The user
 can switch to **All chats**. Sync reports new chats and newly added message IDs,
 shows progress, and supports stopping safely.
 
@@ -47,10 +47,11 @@ The list-token no-op rule is an accepted product decision. The existing
 observations do not establish stable ordering, complete paging, or safety for
 early-stop paging.
 
-Latest-10 mode does not trust page order: it scans every page, sorts a
-homogeneous set of parseable list-item `update_time` values, and fails
-explicitly if values are missing, invalid, or mixed. Full-list mode remains
-available when the list cannot be safely ranked.
+At the user's request, validation now uses a bounded first-page sample rather
+than the previous full-history timestamp ranking. Page ordering remains
+unverified, so “latest-10” does not guarantee the account-wide latest chats.
+Missing/mixed timestamps do not require ranking. All-chats mode still scans
+the complete list to an empty terminal page.
 
 ## Entry gate and no-op decision
 
@@ -65,7 +66,7 @@ a separate live proof before implementation. The raw payload hash remains the
 content comparison when a detail is fetched; it cannot independently verify a
 conversation whose detail request was skipped.
 
-Early-stop paging is a separate optimization. The first implementation must
+Early-stop paging is a separate All-chats optimization. All-chats must
 enumerate every list page; enable stopping after unchanged pages only after
 stable descending ordering has been established. Keep IDs, titles, message
 content, and session values out of logs and committed fixtures.
@@ -158,7 +159,8 @@ focused client/engine tests.
   content, and a changing total. On an unstable scan, retry listing from offset
   zero once; if it remains unstable, end with an explicit partial/failure
   result and do not infer deletions.
-- Page the full list in the first implementation. Do not infer completeness
+- Page the full list in All-chats mode. Validation requests one page of ten
+  entries and never claims complete remote coverage. Do not infer completeness
   from the number of unchanged pages; early-stop can be added later if ordering
   is established.
 
@@ -178,10 +180,10 @@ for entries with matching well-formed list tokens.
 - Route session, list, conversation-detail, and API-probe requests through one
   serialized request pacer. Wait at least two seconds after the complete
   response is read before starting another ChatGPT request.
-- In the default validation scope, select up to 10 chats by descending
-  parseable list-item `update_time` after fully enumerating the list. Do not
-  infer recency from response order; fail clearly if timestamps cannot be
-  compared safely.
+- In the default validation scope, request only `offset=0&limit=10`, preserve
+  response order, and make no second list request even for short/empty pages
+  or a larger advertised total. Reject oversized/duplicate responses without
+  syncing details. Do not claim globally latest selection.
 - Report newly inserted chat counts separately from message IDs not previously
   stored for those conversations.
 - Reuse the current 401 and 429/5xx error behavior. A fatal session/host error
@@ -246,10 +248,9 @@ Automated and local integration checks are complete:
 ## Wave 3 acceptance
 
 - A user can start and stop an all-chat sync from the primary popup action.
-- The popup defaults to syncing details for only the 10 most recently updated
-  chats and can be switched to all chats; latest selection uses validated
-  timestamps rather than page order.
-- Every list page is processed; early-stop is not part of the first
+- The popup defaults to one list page of ten entries and at most ten detail
+  requests, with a clear unverified-recency disclaimer, and can switch to all chats.
+- In All-chats mode every list page is processed; early-stop is not part of the first
   implementation unless stable ordering is separately verified.
 - New and changed conversations are stored; unchanged conversations do not
   rewrite message rows. A matching list `update_time` is the agreed no-op

@@ -2,8 +2,15 @@ export type Account = { id: string; label: string; conversationCount: number };
 export type ConversationGroup = {
   id: string; kind: 'all' | 'project' | 'gpt' | 'unmarked' | 'other';
   label: string; conversationCount: number;
+  project?: {
+    description: string | null; archived: boolean | null; updatedAt: string | null;
+    syncedAt: string; older: boolean; catalogStatus: 'running' | 'completed' | 'failed' | 'cancelled';
+    catalogError: string | null;
+  };
 };
-export type ArchiveStatus = { schemaVersion: number; accounts: number; conversations: number; messages: number };
+export type ArchiveStatus = {
+  schemaVersion: number; accounts: number; conversations: number; messages: number; lastSyncAt: string | null;
+};
 export type ConversationSummary = {
   id: string; title: string | null; updateTime: number | null;
   lastSyncedAt: string; messageCount: number;
@@ -30,7 +37,8 @@ function nullableTime(value: unknown): value is number | null {
   return value === null || typeof value === 'number' && Number.isFinite(value);
 }
 export function isStatus(value: unknown): value is ArchiveStatus {
-  return record(value) && count(value.schemaVersion) && count(value.accounts) && count(value.conversations) && count(value.messages);
+  return record(value) && count(value.schemaVersion) && count(value.accounts) && count(value.conversations) &&
+    count(value.messages) && nullableText(value.lastSyncAt);
 }
 export function isAccounts(value: unknown): value is Account[] {
   return Array.isArray(value) && value.every(item => record(item) &&
@@ -39,7 +47,13 @@ export function isAccounts(value: unknown): value is Account[] {
 export function isGroups(value: unknown): value is ConversationGroup[] {
   return Array.isArray(value) && value.every(item => record(item) &&
     typeof item.id === 'string' && typeof item.label === 'string' && count(item.conversationCount) &&
-    typeof item.kind === 'string' && ['all', 'project', 'gpt', 'unmarked', 'other'].includes(item.kind));
+    typeof item.kind === 'string' && ['all', 'project', 'gpt', 'unmarked', 'other'].includes(item.kind) &&
+    (item.project === undefined || record(item.project) &&
+      nullableText(item.project.description) && (item.project.archived === null || typeof item.project.archived === 'boolean') &&
+      nullableText(item.project.updatedAt) && typeof item.project.syncedAt === 'string' &&
+      typeof item.project.older === 'boolean' && nullableText(item.project.catalogError) &&
+      typeof item.project.catalogStatus === 'string' &&
+      ['running', 'completed', 'failed', 'cancelled'].includes(item.project.catalogStatus)));
 }
 export function isSummary(value: unknown): value is ConversationSummary {
   return record(value) && typeof value.id === 'string' && nullableText(value.title) &&

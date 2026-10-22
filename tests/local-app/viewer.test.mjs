@@ -43,7 +43,9 @@ function unchanged(path) {
 test('viewer opens the existing archive read-only, without startup maintenance or schema changes', t => {
   const { path, archive, accountA } = fixture(t);
   const before = unchanged(path);
-  assert.equal(archive.status().conversations, 3);
+  const status = archive.status();
+  assert.equal(status.conversations, 3);
+  assert.equal(typeof status.lastSyncAt, 'string');
   assert.equal(archive.accounts().length, 2);
   assert.equal(archive.accounts().find(account => account.id === accountA).conversationCount, 2);
   const detail = archive.detail(accountA, 'branch-chat');
@@ -59,7 +61,7 @@ test('missing and incompatible archives fail explicitly without creating a DB', 
   assert.equal(existsSync(join(path, 'sync.db')), false);
   seedViewer(path);
   const db = new DatabaseSync(join(path, 'sync.db'));
-  db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(4, 'synthetic');
+  db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(5, 'synthetic');
   db.close();
   assert.throws(() => new Archive(path), error => error instanceof ViewerError && error.code === 'INCOMPATIBLE_SCHEMA');
 });
@@ -99,7 +101,7 @@ test('an existing empty archive is distinct from a missing or failed archive', t
   writer.close();
   const archive = new Archive(path);
   try {
-    assert.deepEqual(archive.status(), { schemaVersion: 3, accounts: 0, conversations: 0, messages: 0 });
+    assert.deepEqual(archive.status(), { schemaVersion: 4, accounts: 0, conversations: 0, messages: 0, lastSyncAt: null });
     assert.deepEqual(archive.accounts(), []);
   } finally { archive.close(); }
 });
@@ -240,7 +242,9 @@ test('loopback server serves only authenticated scoped reads with private-respon
   assert.deepEqual((await grouped.json()).items.map(chat => chat.id), ['branch-chat']);
   const response = await fetch(`${viewer.origin}/api/status`, { headers: requestHeaders(viewer) });
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).conversations, 3);
+  const status = await response.json();
+  assert.equal(status.conversations, 3);
+  assert.equal(typeof status.lastSyncAt, 'string');
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.equal(response.headers.get('access-control-allow-origin'), null);
   assert.match(response.headers.get('content-security-policy'), /default-src 'none'/);

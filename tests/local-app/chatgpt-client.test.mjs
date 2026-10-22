@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   clearTokenCache, conversationListUpdateToken, createChatGptRequestPacer, fetchConversation,
-  fetchConversationListPage, loadChatGptAccount, loadToken,
+  fetchConversationListPage, fetchProjectSidebarPage, loadChatGptAccount, loadToken, verifyChatGptScope,
 } from '../../lib/chatgpt-client.ts';
+import { projectCaptureShape } from '../fixtures/project-catalog.mjs';
 
 function withFetch(t, fetch) {
   const original = globalThis.fetch;
@@ -14,6 +15,42 @@ function withFetch(t, fetch) {
     globalThis.fetch = original;
   });
 }
+
+test('sidebar adapter uses observed URL, logs raw data before parsing and refuses unverified continuation', async t => {
+  const requests = [];
+  const events = [];
+  const raw = JSON.stringify(projectCaptureShape());
+  withFetch(t, async (url, options) => {
+    requests.push({ url: String(url), options });
+    return new Response(raw);
+  });
+  const page = await fetchProjectSidebarPage('synthetic-token', null, undefined, async event => { events.push(event); });
+  assert.equal(page.items.length, 7);
+  assert.equal(requests[0].url, 'https://chatgpt.com/backend-api/gizmos/snorlax/sidebar?conversations_per_gizmo=5&limit=20&owned_only=false');
+  assert.equal(events[0].body, raw);
+  await assert.rejects(fetchProjectSidebarPage('synthetic-token', 'opaque'), error => error.category === 'pagination-unverified');
+  assert.equal(requests.length, 1);
+  globalThis.fetch = async () => new Response('bad JSON synthetic-token');
+  await assert.rejects(fetchProjectSidebarPage('synthetic-token', null, undefined, async event => { events.push(event); }), SyntaxError);
+  assert.equal(events[1].body, 'bad JSON [REDACTED]');
+});
+
+test('scope verification uses an uncached session and never accepts a changed user, workspace or token', async t => {
+  let body = { accessToken: 'secret', user: { id: 'user' }, account: { id: 'workspace' } };
+  withFetch(t, async () => new Response(JSON.stringify(body)));
+  const scope = { userId: 'user', workspaceId: 'workspace' };
+  await verifyChatGptScope(scope, 'secret');
+  for (const changed of [
+    { ...body, user: { id: 'other' } },
+    { ...body, account: { id: 'other' } },
+    { ...body, accessToken: 'different' },
+  ]) {
+    const original = body;
+    body = changed;
+    await assert.rejects(verifyChatGptScope(scope, 'secret'), error => error.category === 'account-mismatch');
+    body = original;
+  }
+});
 
 test('ChatGPT request pacer waits at least two seconds after each completed request', async () => {
   let now = 0;

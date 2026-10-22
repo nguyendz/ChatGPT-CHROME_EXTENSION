@@ -89,7 +89,7 @@ Native sync host ------------------> same DB through the existing WAL writer
 
 - Open `DatabaseSync` with `{ readOnly: true }` and enable `query_only`.
   A missing database is an explicit error, never an empty successful archive.
-- Check the schema version and required columns. For 6A support schema 3;
+- Check the schema version and required columns. Support schemas 3 and 4;
   reject incompatible schemas with a clear update instruction.
 - Do not migrate, seed, set `journal_mode`, repair rows, update metadata,
   or mark running syncs failed. The sync host remains the only archive writer.
@@ -167,7 +167,7 @@ account ownership. The client never supplies raw SQL or a database path.
 |---|---|
 | `GET /api/status` | Schema support and aggregate archive counts; no raw payloads or access token. |
 | `GET /api/accounts` | Local profile identifiers/labels for explicit account selection. |
-| `GET /api/groups?accountId=...` | Account-scoped provisional project/GPT folders, unmarked/other buckets, and counts. |
+| `GET /api/groups?accountId=...` | Account-scoped project/GPT folders, saved project names/details where available, unmarked/other buckets, and local counts. |
 | `GET /api/conversations?accountId=...&limit=...&cursor=...` | Summary list only, with a next-page cursor. |
 | `GET /api/conversations/:id?accountId=...` | Metadata, revision, active-branch count, and warnings. |
 | `GET /api/conversations/:id/messages?accountId=...&revision=...&cursor=...&limit=...` | Ordered active-branch message page, not raw mapping or all branches. |
@@ -279,7 +279,7 @@ During a self-contained browser check, stop the test server/browser afterward.
 
 ### Implementation checkpoint (2026-10-20)
 
-- `local-app/viewer/archive.ts`: read-only schema-3 reader, account scoping,
+- `local-app/viewer/archive.ts`: read-only schema-3/4 reader, account scoping,
   deterministic cursors, active-path validation, and revision-aware paging.
 - `local-app/viewer/server.ts`: authenticated loopback-only server, private
   response headers, bounded responses, locally built assets, and shutdown.
@@ -288,8 +288,10 @@ During a self-contained browser check, stop the test server/browser afterward.
 - Project grouping now derives account-scoped folders from saved root metadata:
   `snorlax` + `g-p-` IDs for observed project-like groups; `gpt` + `g-` IDs
   for custom GPTs. Missing markers and unclassified markers remain separate.
-  Labels are explicitly unnamed/provisional because project names are not in
-  the archive. No migration or database write is needed.
+  Wave 4A enriches stable project groups with saved sidebar names/details,
+  including zero-local-chat projects and older metadata indicators. Schema 3
+  and groups without saved names retain provisional labels. Only the host
+  migrates/writes the catalog; the viewer stays read-only.
 - Rich rendering was added at the user's request: GFM Markdown, sanitized raw
   HTML, opt-in HTML-code previews, readable tables/code, safe external links,
   and blocked-image placeholders. This does not enable branch navigation,

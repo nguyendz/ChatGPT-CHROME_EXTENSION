@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { HOST_VERSION, PROTOCOL_VERSION, isApiDebugChunk, isApiProbeReport, isRecord } from '../../lib/sync/protocol.ts';
+import { HOST_VERSION, PROTOCOL_VERSION, isApiDebugChunk, isApiProbeReport, isProjectSyncOutcome, isRecord } from '../../lib/sync/protocol.ts';
+import { ProjectCatalogError } from '../../lib/project-catalog.ts';
 import { HostOperationError, type HostDatabase } from './db.ts';
 import type { AccountScope, ApiDebugChunk, ErrorCode, HostResponse, ResponsePayloads } from '../../lib/sync/protocol.ts';
 
@@ -32,6 +33,9 @@ function isManifestItem(value: unknown): value is { conversationId: string; upda
 
 function operationError(id: string, error: unknown): HostResponse {
   if (error instanceof HostOperationError) return errorResponse(id, error.code, error.message);
+  if (error instanceof ProjectCatalogError) {
+    return errorResponse(id, error.category === 'size-limit' ? 'TOO_LARGE' : 'INVALID_PAYLOAD', error.message);
+  }
   console.error('Database request failed:', error);
   return errorResponse(id, 'DB_ERROR', 'Cannot complete the local sync operation. See host.log.');
 }
@@ -92,15 +96,29 @@ export function handleRequest(
   }
   if (type === 'beginRun') {
     if (typeof payload.runId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(payload.runId) ||
-      (payload.mode !== 'single' && payload.mode !== 'incremental') || !isAccountScope(payload.account)) {
+      (payload.mode !== 'single' && payload.mode !== 'incremental') || !isAccountScope(payload.account) ||
+      (payload.projectCatalog !== undefined && typeof payload.projectCatalog !== 'boolean')) {
       return errorResponse(id, 'INVALID_PAYLOAD', 'beginRun requires a run ID, supported mode, and user/workspace scope.');
     }
     try {
-      return success(id, type, database().beginRun(payload.runId, payload.mode, payload.account));
+      return success(id, type, database().beginRun(payload.runId, payload.mode, payload.account, payload.projectCatalog));
     } catch (error) {
       return operationError(id, error);
     }
   }
+  if (type === 'commitProjectCatalog') {
+      if (Object.keys(payload).length !== 2 || typeof payload.runId !== 'string' ||
+        !/^[a-zA-Z0-9-]{1,128}$/.test(payload.runId) || !Array.isArray(payload.items) ||
+        !payload.items.every(item => isRecord(item) && Object.keys(item).length === 2 &&
+          isRecord(item.raw) && typeof item.sha256 === 'string' && /^[a-f0-9]{64}$/.test(item.sha256))) {
+        return errorResponse(id, 'INVALID_PAYLOAD', 'Expected a run ID and hashed project metadata items.');
+      }
+      try {
+        return success(id, type, database().commitProjectCatalog(payload.runId, payload.items));
+      } catch (error) {
+        return operationError(id, error);
+      }
+    }
   if (type === 'diffManifest') {
     if (typeof payload.runId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(payload.runId) ||
       !Array.isArray(payload.items) || payload.items.length > 50 ||
@@ -138,11 +156,12 @@ export function handleRequest(
       typeof payload.cancelled !== 'boolean' || !Array.isArray(payload.failures) ||
       !payload.failures.every(failure => isRecord(failure) &&
         (failure.conversationId === null || typeof failure.conversationId === 'string') &&
-        typeof failure.error === 'string' && typeof failure.retryable === 'boolean')) {
+        typeof failure.error === 'string' && typeof failure.retryable === 'boolean') ||
+      (payload.projects !== undefined && !isProjectSyncOutcome(payload.projects))) {
       return errorResponse(id, 'INVALID_PAYLOAD', 'endRun requires a run ID, cancellation state, and valid failures.');
     }
     try {
-      return success(id, type, database().endRun(payload.runId, payload.cancelled, payload.failures));
+      return success(id, type, database().endRun(payload.runId, payload.cancelled, payload.failures, payload.projects));
     } catch (error) {
       return operationError(id, error);
     }

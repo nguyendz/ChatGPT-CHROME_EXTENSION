@@ -1,5 +1,5 @@
 export const HOST_NAME = 'com.chatgpt_backup.sync';
-export const HOST_VERSION = '0.4.0';
+export const HOST_VERSION = '0.5.0';
 export const PROTOCOL_VERSION = 1;
 export const MAX_HOST_TO_EXT_BYTES = 1_000_000;
 export const MAX_EXT_TO_HOST_BYTES = 64 * 1024 * 1024;
@@ -10,6 +10,23 @@ export const API_DEBUG_CHUNK_CHARS = 16 * 1024;
 export type ApiDebugChunk = {
   runId: string; entryId: string; part: number; parts: number; data: string;
 };
+
+export type ProjectFailureCategory = 'unauthorized' | 'forbidden' | 'rate-limited' |
+  'server-error' | 'invalid-response' | 'pagination-unverified' | 'unstable-pagination' |
+  'size-limit' | 'account-mismatch' | 'local-host' | 'network-error' | 'cancelled';
+export type ProjectSyncOutcome =
+  | { status: 'completed'; count: number }
+  | { status: 'failed' | 'cancelled'; category: ProjectFailureCategory };
+
+export function isProjectSyncOutcome(value: unknown): value is ProjectSyncOutcome {
+  return isRecord(value) && (
+    value.status === 'completed' && typeof value.count === 'number' &&
+      Number.isSafeInteger(value.count) && value.count >= 0 ||
+    (value.status === 'failed' || value.status === 'cancelled') && typeof value.category === 'string' &&
+      ['unauthorized', 'forbidden', 'rate-limited', 'server-error', 'invalid-response',
+        'pagination-unverified', 'unstable-pagination', 'size-limit', 'account-mismatch',
+        'local-host', 'network-error', 'cancelled'].includes(value.category));
+}
 
 export type ErrorCode = 'PROTOCOL_MISMATCH' | 'BUSY' | 'INVALID_PAYLOAD' |
   'UNKNOWN_TYPE' | 'TOO_LARGE' | 'DB_ERROR' | 'DISK_FULL' |
@@ -53,7 +70,8 @@ export type RequestPayloads = {
   getStatus: Record<string, never>;
   recordApiProbe: ApiProbeReport;
   recordApiDebug: ApiDebugChunk;
-  beginRun: { runId: string; mode: 'single' | 'incremental'; account: AccountScope };
+  beginRun: { runId: string; mode: 'single' | 'incremental'; account: AccountScope; projectCatalog?: boolean };
+  commitProjectCatalog: { runId: string; items: Array<{ raw: Record<string, unknown>; sha256: string }> };
   diffManifest: {
     runId: string;
     items: Array<{ conversationId: string; updateTimeToken: string | null }>;
@@ -69,6 +87,7 @@ export type RequestPayloads = {
     runId: string;
     cancelled: boolean;
     failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>;
+    projects?: ProjectSyncOutcome;
   };
 };
 export type AccountScope = { userId: string; workspaceId: string; email?: string };
@@ -90,6 +109,7 @@ export type ResponsePayloads = {
   recordApiProbe: { probeId: string; logged: true };
   recordApiDebug: { entryId: string; part: number; logged: true };
   beginRun: { runId: string; accountId: string };
+  commitProjectCatalog: { count: number };
   diffManifest: {
     listed: number;
     unchanged: number;
@@ -210,6 +230,8 @@ export function isResponsePayload<K extends keyof ResponsePayloads>(
   if (!isRecord(value)) return false;
   if (type === 'echo') return typeof value.bytes === 'number' && typeof value.sha256 === 'string';
   if (type === 'beginRun') return typeof value.runId === 'string' && typeof value.accountId === 'string';
+  if (type === 'commitProjectCatalog') return typeof value.count === 'number' &&
+    Number.isSafeInteger(value.count) && value.count >= 0;
   if (type === 'diffManifest') return typeof value.listed === 'number' &&
     Number.isSafeInteger(value.listed) && value.listed >= 0 &&
     typeof value.unchanged === 'number' && Number.isSafeInteger(value.unchanged) &&

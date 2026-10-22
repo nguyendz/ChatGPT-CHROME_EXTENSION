@@ -47,6 +47,11 @@ function nullableText(row: Row, key: string): string | null {
   return row[key] === null ? null : text(row, key);
 }
 
+function catalogStatus(value: SQLOutputValue): 'running' | 'completed' | 'failed' | 'cancelled' {
+  if (value === 'running' || value === 'completed' || value === 'failed' || value === 'cancelled') return value;
+  return corrupt();
+}
+
 function summary(row: Row): ConversationSummary {
   return {
     id: text(row, 'id'), title: nullableText(row, 'title'),
@@ -90,20 +95,27 @@ function encodeCursor(value: unknown): string {
 
 export class Archive {
   private db: DatabaseSync;
+  private schemaVersion: number;
 
   constructor(directory: string) {
     this.db = new DatabaseSync(join(directory, 'sync.db'), { readOnly: true });
     try {
       this.db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=2000;');
       const version = this.db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()?.version;
-      if (version !== 3) {
-        throw new ViewerError(409, 'INCOMPATIBLE_SCHEMA', 'This viewer requires archive schema 3. Update the host/viewer together.');
+      if (version !== 3 && version !== 4) {
+        throw new ViewerError(409, 'INCOMPATIBLE_SCHEMA', 'This viewer requires archive schema 3 or 4. Update the host/viewer together.');
       }
+      this.schemaVersion = version;
       const required: Record<string, string[]> = {
         accounts: ['id', 'label', 'email'],
         conversations: ['id', 'account_id', 'title', 'update_time', 'last_synced_at', 'raw_sha256', 'raw_json', 'project_id', 'gizmo_id'],
         messages: ['id', 'conversation_id', 'role', 'model', 'content_type', 'text', 'create_time'],
+        sync_runs: ['ended_at'],
       };
+      if (version === 4) {
+        required.projects = ['account_id', 'id', 'name', 'description', 'is_archived', 'remote_updated_at', 'last_synced_at', 'last_seen_run_id'];
+        required.project_catalog_state = ['account_id', 'last_successful_run_id', 'status', 'error_category'];
+      }
       for (const [table, columns] of Object.entries(required)) {
         const existing = this.db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name);
         if (columns.some(column => !existing.includes(column))) {
@@ -134,9 +146,14 @@ export class Archive {
     const row = this.db.prepare(`SELECT
       (SELECT COUNT(*) FROM accounts) AS accounts,
       (SELECT COUNT(*) FROM conversations) AS conversations,
-      (SELECT COUNT(*) FROM messages) AS messages`).get();
+      (SELECT COUNT(*) FROM messages) AS messages,
+      (SELECT MAX(ended_at) FROM sync_runs) AS last_sync_at`).get();
     if (!row) return corrupt();
-    return { schemaVersion: 3, accounts: number(row, 'accounts'), conversations: number(row, 'conversations'), messages: number(row, 'messages') };
+    return {
+      schemaVersion: this.schemaVersion, accounts: number(row, 'accounts'),
+      conversations: number(row, 'conversations'), messages: number(row, 'messages'),
+      lastSyncAt: nullableText(row, 'last_sync_at') ? text(row, 'last_sync_at') : null,
+    };
   }
 
   accounts(): Account[] {
@@ -166,11 +183,29 @@ export class Archive {
       }];
       let projects = 0;
       let gpts = 0;
+      const catalog = this.schemaVersion >= 4
+        ? this.db.prepare(`SELECT p.*, s.last_successful_run_id, s.status AS catalog_status, s.error_category
+          FROM projects p JOIN project_catalog_state s ON s.account_id = p.account_id
+          WHERE p.account_id = ? ORDER BY p.id`).all(accountId) : [];
+      const savedProjects = new Map(catalog.map(row => [`project:${text(row, 'id')}`, row]));
+      for (const id of savedProjects.keys()) {
+        if (!rows.some(row => row.group_id === id)) rows.push({ group_id: id, count: 0 });
+      }
+      rows.sort((a, b) => text(a, 'group_id').localeCompare(text(b, 'group_id')));
       for (const row of rows) {
         const id = text(row, 'group_id');
         const conversationCount = number(row, 'count');
         if (id.startsWith('project:')) {
-          groups.push({ id, kind: 'project', label: `Unnamed project ${++projects}`, conversationCount });
+          const saved = savedProjects.get(id);
+          const fallback = `Unnamed project ${++projects}`;
+          groups.push({ id, kind: 'project', label: saved ? text(saved, 'name') : fallback, conversationCount,
+            ...(saved ? { project: {
+              description: nullableText(saved, 'description'), archived: saved.is_archived === null ? null : number(saved, 'is_archived') === 1,
+              updatedAt: nullableText(saved, 'remote_updated_at'), syncedAt: text(saved, 'last_synced_at'),
+              older: text(saved, 'last_seen_run_id') !== saved.last_successful_run_id,
+              catalogStatus: catalogStatus(saved.catalog_status), catalogError: nullableText(saved, 'error_category'),
+            } } : {}),
+          });
         } else if (id.startsWith('gpt:')) {
           groups.push({ id, kind: 'gpt', label: `Unnamed custom GPT ${++gpts}`, conversationCount });
         } else if (id === 'unmarked' || id === 'other') {
@@ -187,7 +222,9 @@ export class Archive {
   list(accountId: string, limit: number, cursor: string | null, group = 'all'): Page<ConversationSummary> {
     return this.snapshot(() => {
       this.checkAccount(accountId);
-      if (group !== 'all' && !this.db.prepare(`SELECT 1 FROM conversations c
+      const savedProject = this.schemaVersion >= 4 && group.startsWith('project:') &&
+        this.db.prepare('SELECT 1 FROM projects WHERE account_id = ? AND id = ?').get(accountId, group.slice(8));
+      if (group !== 'all' && !savedProject && !this.db.prepare(`SELECT 1 FROM conversations c
         WHERE c.account_id = ? AND (${GROUP_KEY_SQL}) = ? LIMIT 1`).get(accountId, group)) {
         throw new ViewerError(404, 'NOT_FOUND', 'Conversation folder not found in this account. Refresh the archive.');
       }

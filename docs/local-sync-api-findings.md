@@ -31,6 +31,25 @@ The extension sends the access token only in the authorization header to
 Its account adapter accepts candidate user/workspace ID fields but fails closed
 if it cannot find both.
 
+## Sidebar project metadata — Wave 4A capture and implementation
+
+The supplied local sidebar capture has 7 distinct named `snorlax` projects at
+`items[].gizmo.gizmo`, a null root cursor, and 31 nested conversation previews.
+Five nested conversation cursors are non-null. The production parser accepts
+this capture; the test fixture recreates only its shape with synthetic values.
+
+Wave 4A syncs that metadata to an account-scoped catalog and the offline viewer.
+It logs sidebar HTTP responses before validation, like the current list/detail
+client; session responses/headers/cookies remain excluded. Session identity/token
+is freshly checked before and after metadata reads, and explicit non-null
+project workspace mismatches are rejected.
+
+This is not proof of complete project membership, archived coverage, or endpoint
+scope across workspaces. Root continuation requests and nested conversation
+paging remain unverified. A non-null root cursor fails explicitly rather than
+guessing a request or committing an incomplete catalog. See the
+[Wave 4 plan](./local-sync-wave-4-plan.md) and [endpoint note](./side-bar.md).
+
 ## Still unknown after the reviewed probes
 
 - Whether `order=updated` is honored. Both reports returned the same ID

@@ -1,5 +1,7 @@
 import type { ChatGptRawConversation } from './chatgpt-parse.ts';
 import type { ApiDebugLogger } from './sync/api-debug.ts';
+import { ProjectCatalogError, projectSidebarPage } from './project-catalog.ts';
+import type { ProjectSidebarPage } from './project-catalog.ts';
 
 export type ChatGptAccount = {
   userId: string;
@@ -86,6 +88,27 @@ export async function loadToken(): Promise<string> {
 
 export async function loadChatGptAccount(): Promise<ChatGptAccount> {
   return accountFromSession(await loadSession());
+}
+
+export async function verifyChatGptScope(account: ChatGptAccount, token: string, signal?: AbortSignal): Promise<void> {
+  await requestChatGpt(async () => {
+    const response = await fetch('https://chatgpt.com/api/auth/session', { signal, cache: 'no-store' });
+    if (!response.ok) {
+      if (response.status === 401) clearTokenCache();
+      throw new ChatGptApiError('Could not verify the ChatGPT session.', response.status);
+    }
+    const value: unknown = await response.json();
+    let current: ChatGptAccount;
+    try { current = accountFromSession(value); }
+    catch {
+      throw new ProjectCatalogError('account-mismatch', 'Could not establish the current ChatGPT user and workspace. No project metadata was stored.');
+    }
+    if (!isRecord(value) || value.accessToken !== token ||
+      current.userId !== account.userId || current.workspaceId !== account.workspaceId) {
+      clearTokenCache();
+      throw new ProjectCatalogError('account-mismatch', 'ChatGPT account or workspace changed. Reload ChatGPT and retry sync.');
+    }
+  }, signal);
 }
 
 export function clearTokenCache() {
@@ -216,6 +239,7 @@ export async function fetchConversationListPage(
     !Number.isSafeInteger(limit) || limit < 1 || limit > CONVERSATION_LIST_PAGE_SIZE) {
     throw new Error('Conversation list page request has an invalid offset or limit.');
   }
+
   return requestChatGpt(async () => {
     const url = new URL('https://chatgpt.com/backend-api/conversations');
     url.searchParams.set('offset', String(offset));
@@ -236,6 +260,21 @@ export async function fetchConversationListPage(
       items.push({ id: item.id, updateTimeToken: conversationListUpdateToken(item.update_time) });
     }
     return { total: value.total, items };
+  }, signal);
+}
+
+export async function fetchProjectSidebarPage(
+  token: string, cursor: string | null, signal?: AbortSignal, logApi?: ApiDebugLogger,
+): Promise<ProjectSidebarPage> {
+  if (cursor !== null) {
+    throw new ProjectCatalogError('pagination-unverified',
+      'Project sidebar needs another page, but its continuation request is not verified. Previous project information was retained.');
+  }
+  return requestChatGpt(async () => {
+    const response = await fetchApiResponse(token,
+      'https://chatgpt.com/backend-api/gizmos/snorlax/sidebar?conversations_per_gizmo=5&limit=20&owned_only=false',
+      'project sidebar', signal, 5, 1, logApi);
+    return projectSidebarPage(await response.json());
   }, signal);
 }
 

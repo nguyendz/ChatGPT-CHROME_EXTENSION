@@ -6,7 +6,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startViewer } from '../../local-app/viewer/server.ts';
-import { seedViewer, simpleRaw, writeConversation } from '../fixtures/viewer-archive.mjs';
+import { seedViewer, simpleRaw, writeConversation, scopeA, scopeB } from '../fixtures/viewer-archive.mjs';
+import { projectRaw, projectItem } from '../fixtures/project-catalog.mjs';
+import { openDatabase } from '../../local-app/host/db.ts';
 
 const directory = await mkdtemp(join(tmpdir(), 'chatgpt-viewer-browser-'));
 let viewer;
@@ -75,12 +77,25 @@ try {
     }
     throw new Error(`Browser check timed out: ${expression}`);
   }
+  async function chooseFolder(label) {
+    await evaluate(`(() => {
+      const select = document.querySelector('#folder-select');
+      const option = [...select.options].find(item => item.textContent.trim().startsWith(${JSON.stringify(`${label} (`)}));
+      if (!option) throw new Error('Folder option not found: ' + ${JSON.stringify(label)});
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+  }
   await command('Runtime.enable', {}, sessionId);
   await command('Network.enable', {}, sessionId);
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
   await command('Network.setBlockedURLs', { urls: ['https://*', 'http://example.*'] }, sessionId);
   await command('Page.navigate', { url: viewer.url }, sessionId);
   await until('document.querySelectorAll(".chat-item").length === 50');
+  assert.equal(await evaluate('document.querySelector(".chat-item strong").textContent'), 'Conversation long-chat (205)');
+  assert.equal(await evaluate('document.querySelector(".chat-item").textContent.includes("Updated") || document.querySelector(".chat-item").textContent.includes("Synced")'), false);
+  assert.match(await evaluate('document.querySelector(".sidebar-footer-summary").innerText.replace(/\\s+/g, " ")'), /^\d+ conversations\s+Last sync /);
+  assert.equal(await evaluate('document.querySelector(".sidebar-footer-summary").textContent.includes("Never")'), false);
   assert.equal(await evaluate('location.hash'), '', 'Launch token must be removed from the address bar');
   assert.equal(await evaluate('document.body.innerText.includes("Local only / Read-only")'), true);
   await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more conversations').click()`);
@@ -92,18 +107,18 @@ try {
   await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
   await until('!!document.querySelector(".conversation-heading")');
 
-  await until('document.querySelectorAll(".folder-item").length === 6');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
+  await until('document.querySelectorAll("#folder-select option").length === 6');
+  await chooseFolder('Unnamed project 1');
   await until('document.querySelectorAll(".chat-item").length === 2');
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
-  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true]").textContent'), 'Unnamed project 12');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed custom GPT 1')).click()`);
-  await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item strong").textContent === "Untitled conversation"');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Other marked chats')).click()`);
+  assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent.trim()')).startsWith('Unnamed project 1 ('));
+  await chooseFolder('Unnamed custom GPT 1');
+  await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item strong").textContent.startsWith("Untitled conversation (")');
+  await chooseFolder('Other marked chats');
   await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item").textContent.includes("extra-001")');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('No project marker')).click()`);
+  await chooseFolder('No project marker');
   await until('document.querySelectorAll(".chat-item").length === 49');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('All conversations')).click()`);
+  await chooseFolder('All conversations');
   await until('document.querySelectorAll(".chat-item").length === 50');
 
   await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Conversation long-chat')).click()`);
@@ -168,10 +183,10 @@ try {
   })()`);
   await until('document.querySelectorAll(".chat-item").length === 1 && document.querySelector(".chat-item").textContent.includes("other-account-chat")');
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
-  await until('document.querySelectorAll(".folder-item").length === 2');
-  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true] span").textContent'), 'All conversations');
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
-  await until('document.querySelector(".folder-item[aria-current=true] span").textContent === "Unnamed project 1"');
+  await until('document.querySelectorAll("#folder-select option").length === 2');
+  assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent.trim()')).startsWith('All conversations ('));
+  await chooseFolder('Unnamed project 1');
+  await until('document.querySelector("#folder-select").selectedOptions[0].textContent.trim().startsWith("Unnamed project 1 (")');
   assert.equal(await evaluate('document.querySelectorAll(".chat-item").length'), 1);
 
   await evaluate(`document.querySelector('#account').value = [...document.querySelector('#account').options].find(option => option.value !== ${JSON.stringify(accountB)}).value;
@@ -189,17 +204,54 @@ try {
   assert.equal(await evaluate('document.activeElement.textContent'), 'Refresh archive');
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".header-controls button")).outlineStyle'), 'solid');
   assert.equal(await evaluate('!!document.querySelector("button").disabled'), false);
-  await evaluate(`[...document.querySelectorAll('.folder-item')].find(button => button.textContent.includes('Unnamed project 1')).click()`);
+  await chooseFolder('Unnamed project 1');
   await until('document.querySelectorAll(".chat-item").length === 2');
   await evaluate('document.querySelector(".header-controls button").click()');
-  await until('document.querySelectorAll(".folder-item").length === 6 && document.querySelectorAll(".chat-item").length === 2');
-  assert.equal(await evaluate('document.querySelector(".folder-item[aria-current=true] span").textContent'), 'Unnamed project 1');
+  await until('document.querySelectorAll("#folder-select option").length === 6 && document.querySelectorAll(".chat-item").length === 2');
+  assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent.trim()')).startsWith('Unnamed project 1 ('));
+  const saveCatalog = (runId, scope, items) => {
+    const host = openDatabase(directory);
+    try {
+      host.beginRun(runId, 'incremental', scope, true);
+      host.commitProjectCatalog(runId, items.map(projectItem));
+      host.endRun(runId, false, [], { status: 'completed', count: items.length });
+    } finally { host.close(); }
+  };
+  const projectName = 'Research <img src=https://example.test/icon onerror=alert(1)>';
+  const project = projectRaw('g-p-fixture-a', projectName);
+  project.gizmo.gizmo.display.description = '<script>not executed</script> Project description';
+  project.gizmo.gizmo.display.profile_picture_url = 'https://example.test/remote-icon';
+  saveCatalog('browser-projects', scopeA, [project, projectRaw('g-p-empty', 'Empty local project')]);
+  saveCatalog('browser-other-projects', scopeB, [projectRaw('g-p-fixture-a', 'Other account project')]);
+  await evaluate('document.querySelector(".chat-item").click()');
+  await until('document.querySelectorAll(".message").length === 3');
+  await evaluate('document.querySelector(".header-controls button").click()');
+  await until(`document.querySelector('#folder-select').selectedOptions[0].textContent.trim().startsWith(${JSON.stringify(`${projectName} (`)})`);
+  await until('document.querySelectorAll(".message").length === 3');
+  assert.equal(await evaluate('document.querySelectorAll("#folder-select option").length'), 7);
+  assert.equal(await evaluate('document.querySelectorAll(".section-label, .project-details, #folder-select img, #folder-select script").length'), 0);
+  assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent')).includes(projectName));
+  assert.equal(await evaluate('document.querySelectorAll(".chat-item").length'), 2);
+  await chooseFolder('Empty local project');
+  await until('document.querySelectorAll(".chat-item").length === 0 && document.body.innerText.includes("No conversations saved in this folder")');
+  assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent.trim()')).endsWith('(0)'));
+  project.gizmo.gizmo.display.name = 'Renamed research';
+  saveCatalog('browser-project-rename', scopeA, [project]);
+  await evaluate('document.querySelector(".header-controls button").click()');
+  await until('[...document.querySelectorAll("#folder-select option")].some(option => option.textContent.includes("Renamed research"))');
+  await chooseFolder('Renamed research');
+  await until('document.querySelectorAll(".chat-item").length === 2');
+  assert.equal(await evaluate('document.querySelectorAll(".section-label, .project-details").length'), 0);
+  await evaluate(`document.querySelector('#account').value = ${JSON.stringify(accountB)};
+    document.querySelector('#account').dispatchEvent(new Event('change', { bubbles: true }));`);
+  await until('[...document.querySelectorAll("#folder-select option")].some(option => option.textContent.includes("Other account project"))');
+  assert.equal(await evaluate('document.body.innerText.includes("Renamed research")'), false);
   await command('Page.reload', {}, sessionId);
   await until('document.body.innerText.includes("This tab has no access token")');
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
   assert.deepEqual(externalRequests, [], 'Viewer must not request remote resources');
   assert.deepEqual(exceptions, [], 'Viewer must not throw browser runtime errors');
-  console.log('Viewer browser checks passed: Markdown/raw HTML, opt-in HTML code preview, sanitization and blocked media, literal code, folders, refresh, paging, account switching, narrow layout, revision reload, and private launch.');
+  console.log('Viewer browser checks passed: compact conversation rows, folder names/counts, last-sync footer, account isolation, hostile metadata, Markdown/HTML, paging, narrow layout, revision reload, and private launch.');
 } finally {
   ws?.close();
   if (browser && browser.exitCode === null) browser.kill();

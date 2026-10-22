@@ -1,10 +1,12 @@
 # Feature: Local Sync (ChatGPT → Local Database)
 
 > **Current implementation:** this is a design reference, not a complete feature
-> inventory. The extension currently supports manual sync of the open saved
-> conversation and local diagnostics. Download/export code and UI have been
-> removed. All-chat, project, automatic sync, asset transfer, and viewer items
-> below remain future proposals unless marked complete in the wave plan.
+> inventory. Manual current-chat and incremental sync, local diagnostics, and
+> the separate read-only Wave 6A viewer are implemented. Wave 4A project metadata
+> and viewer labels are implemented with signed-in acceptance pending.
+> Wave 4B/4C coverage/reconciliation, automation, and account-selection work remains planned
+> in the [detailed Wave 4 plan](./local-sync-wave-4-plan.md). Delivery and live
+> acceptance status are tracked in the wave plans, not inferred from this design.
 
 | | |
 |---|---|
@@ -26,8 +28,9 @@ The extension provides **Sync** for the currently open saved conversation. The
 popup sends the raw conversation to a **local database** owned by a **local app**
 (a native-messaging host; see §10). ChatGPT requests run in the logged-in
 browser session; the access token stays in the extension. The current
-implementation is manual and single-chat; the broader incremental history
-workflow described here remains future scope.
+implementation supports manual single-chat and incremental history sync.
+Wave 4 extends it with project metadata, verified multi-source coverage,
+reconciliation, and opt-in automation.
 
 > **Why a local app?** A Chrome extension cannot open SQLite or other databases
 > or write freely to the file system. A local process owns the database, and
@@ -83,7 +86,7 @@ The current single-chat implementation and future architecture boundaries are:
 | `fetchConversation(token, id)` with 429/5xx backoff | Fetch changed conversations. |
 | `parseConversationNodes()` | Host-side message-row derivation; the raw payload remains the source of truth. |
 | Attachment/image retrieval | Future asset sync; not implemented. |
-| Project conversation discovery | Project-aware sync proposal (Wave 4); not implemented. |
+| Project metadata and conversation discovery | Wave 4: 4A saves sidebar names/information for viewer folders; 4B verifies full project/archived chat coverage and reconciliation. Sidebar previews are not full conversations. |
 | Popup sync action and native-host acknowledgements | Current single-chat status and failure feedback. |
 
 Current permissions are `activeTab`, `nativeMessaging`, and host
@@ -153,13 +156,14 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
 ### 6.3 Incremental sync (default)
 ```
 1. ext → host  beginRun {runId, mode:"incremental", account}
-2. ext reads /backend-api/conversations pages (up to 50 per request) until an
-   empty page confirms the end, advancing the offset by the returned item count.
+2. In All-chats mode, ext reads /backend-api/conversations pages (up to 50 per
+   request) until an empty page confirms the end, advancing the offset by the returned item count.
    The API total is a hint, not an exact count; changing totals and short pages
    do not end or invalidate a scan. Duplicate IDs trigger one retry from offset 0.
-3. In latest-10 validation mode, sort the complete list by comparable,
-   parseable update_time values and select up to 10. The All chats mode selects
-   every item. Never infer recency or completeness from page order.
+3. In latest-10 validation mode, request only offset=0&limit=10 and select the
+   returned entries in response order, without further paging or an end probe.
+   This is a bounded validation sample, not verified global recency/completeness.
+   All-chats mode selects every enumerated item.
 4. ext → host  diffManifest {items:[{conversationId, updateTimeToken}]}
    For exact matching non-null tokens, skip the detail request. Fetch details
    for new/changed IDs and items whose list token is unavailable.
@@ -169,12 +173,14 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
    host → ext  ack {id, status, messageCount, newMessageCount}
 7. ext → host  endRun {runId, cancelled, failures}
 ```
-- Early-stop paging is not implemented. Every list page is read so latest-10 selection does not depend on unverified API ordering.
+- All-chats early-stop paging is not implemented. Validation deliberately reads
+  one small page, independently of the unverified ordering optimization.
 - The observed API returns offset-dependent totals such as 51 at offset 0 and
   101 at offset 50, each with 50 items. Listing progress shows only the number
   read; the exact total is set after an empty page is received. The terminal
   request is required even after a short page or an advertised exact total.
-- If latest-10 timestamps are missing, invalid, or mixed between strings and numbers, the run fails with a prompt to select **All chats** rather than guessing.
+- Validation does not rank timestamps. Missing list tokens conservatively fetch
+  details, using the existing per-conversation no-op rules.
 - `newMessageCount` counts message IDs not previously stored for a conversation; it is separate from the number of new chats and the total messages in the response.
 - Sync captures full list/detail HTTP response bodies before validation in the
   private local `logs\api-debug.jsonl` file, including retry/error responses.
@@ -185,11 +191,38 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
   precautions. The sanitized API probe and `host.log` remain separate.
 
 ### 6.4 Full reconciliation
-This runs when the user chooses **Full re-sync**, or automatically every N incremental runs (default: weekly):
-- List the entire remote manifest, with no early stop.
-- Mark local conversations missing from the remote list as `remote_state = 'missing'`. This covers deleted conversations, and archived ones if archived conversations are excluded.
+Planned in Wave 4B / W4.1; the weekly scheduling hook is Wave 4C / W4.4.
+Manual reconciliation does not depend on the scheduler. A weekly full run is
+enabled only after both tasks pass their gates:
+- Verify account-scoped coverage of default, archived, and project sources;
+  consume each source to its confirmed terminal condition with no early stop.
+- Deduplicate the completed source union before manifest comparison/detail
+  selection. Latest-10 and All-chats incremental runs do not authorize absence
+  reconciliation; only an explicit successful full run does.
+- Mark local conversations absent from that verified scope as
+  `remote_state = 'missing'`, not “confirmed deleted.” Archived chats are not
+  missing merely because they are excluded from the default list.
+- Unverified/inaccessible coverage, source failures, cancellation, or account
+  mismatch prevents missing-state updates. Reappearance clears missing state.
 - Optional: `verifyContent`, which re-fetches everything and compares sha256 to repair local corruption.
-- Never hard-delete by default. A setting, *"Remove local copies of chats deleted on ChatGPT"*, is off by default.
+- Never hard-delete by default. Any opt-in removal setting is off by default
+  and cannot bypass the successful-full-run coverage/account gates.
+
+### 6.4.1 Project catalog and folder labels
+
+Wave 4A / W4.0 implements the sidebar's account-scoped project catalog independently
+of chat update tokens, on Latest-10 and All-chats runs. The host owns the planned
+schema 3 -> 4 migration; the viewer stays read-only and retains schema 3 fallback
+labels. Join saved names to stable `project:<gizmo_id>` groups by account and ID;
+counts remain local chat counts, including zero-local-chat projects.
+
+Root catalog pagination and nested project-conversation pagination are separate.
+The supplied sidebar response establishes metadata shape/names, not complete
+project membership or archive coverage. Preserve raw project information and
+older metadata on failure/absence; do not infer deleted projects, import previews
+as full chats, or fetch icon/file URLs. Metadata failures are explicit and
+separate from conversation counts. See the
+[Wave 4 plan](./local-sync-wave-4-plan.md) for bounds, contracts, and tests.
 
 ### 6.5 Asset sync (images and attachments)
 - A future asset-sync implementation will need to identify attachment and
@@ -302,7 +335,10 @@ schema_migrations(version, applied_at)
 | Done | "7 new · 3 updated · 1,942 unchanged · 1 missing remotely" |
 | Account mismatch | ⚠️ "Logged in as a different account than the local DB" → choose or create a profile |
 
-### Options — new "Sync" tab
+### Planned sync settings
+- Wave 4C adds controls to the existing local-sync UI, not a mandatory Options
+  page redesign. Account/profile selection must precede automated runs; a
+  changed browser identity never silently changes their storage scope.
 - Enable Sync, plus a **Test connection** button showing host version, DB path, and round-trip time.
 - Auto-sync: Off / every 15 min / 30 min / 1 h / 6 h. Uses `chrome.alarms` and runs only if a ChatGPT session token is available.
 - Sync the chat I'm viewing (live).
@@ -363,8 +399,8 @@ The "local app" is two pieces that share one SQLite file:
 | Message edited or response regenerated | New nodes in `mapping` change `update_time` → `changed` → re-upsert. All branches are kept, and `current_node` is updated. |
 | Conversation renamed | Same as above. The title is updated, and the change may show in the list item before the detail payload. |
 | Conversation deleted on ChatGPT | Detected only by full reconciliation → `remote_state='missing'`. Kept locally. |
-| Archived chats | Excluded from the default list. Include them with the `is_archived` list option when the setting is on → `remote_state='archived'`. |
-| Project chats | They may not appear in the main list. Wave 4 enumerates them through the project-listing flow the extension already uses (`getProjectConversationIdsFromTab`), or a project conversations endpoint if one is confirmed. |
+| Archived chats | Wave 4B / W4.2 must verify archive parameters and paging; the exact request remains unconfirmed. Archived chats must not become missing solely through default-list absence. |
+| Project folders/chats | Wave 4A saves actual folder names/metadata. Wave 4B / W4.3 verifies complete project-conversation enumeration and nested paging, deduplicating against other sources before fetching full details. Do not assume an existing discovery helper establishes coverage. |
 | Very large conversation (> 60 MiB raw) | Send `upsertConversation` in chunks (`begin` / `part` / `commit`). |
 | 429 rate limiting | Exponential backoff (existing). The run pauses and shows "Rate limited, resuming in Xs". |
 | Token expired mid-run | Existing 401 → `clearTokenCache()` → retry once. If that fails, the run ends with `needsLogin`. |
@@ -385,8 +421,8 @@ Delivery is planned in waves in [local-sync-development-waves.md](./local-sync-d
 |---|---|
 | **1 — Milestone 1: local app + communication** | The extension (loaded unpacked) talks to the registered local host. Ping, hello, and a large echo work. The DB file is created. The popup shows the host status. |
 | 2 | API spike plus single-chat sync: the current chat goes into the DB. |
-| 3 | Incremental sync of all chats (manifest diff, early stop, runs, Stop). |
-| 4 | Reconciliation, archived and project chats, auto-sync, live sync. |
+| 3 | Incremental sync (full-list enumeration, manifest no-ops, runs, Stop); early-stop remains gated on ordering evidence. |
+| 4 | **4A / W4.0:** project catalog and viewer folder labels. **4B / W4.2, W4.3, W4.1:** verified archived/project coverage, then manual reconciliation. **4C / W4.6, W4.4, W4.5:** account selection, scheduled/live sync; weekly full runs require the 4B gate. See the [detailed Wave 4 plan](./local-sync-wave-4-plan.md). |
 | 5 | Assets (images and attachments). |
 | 6 | Local viewer app: search and export from the DB. |
 
@@ -398,7 +434,7 @@ Delivery is planned in waves in [local-sync-development-waves.md](./local-sync-d
    local-sync details and exposes **Sync this chat**. No download/export feature
    is included.
 2. If the host is not registered, the popup shows "App not registered" with the command to fix it. If the ID is wrong, it shows "ID mismatch".
-3. A latest-10 run reads every list page, selects by comparable list-item `update_time` values rather than response order, and fetches no more than 10 chat details. Full-list mode remains available. Completion reports new chats and newly added message IDs separately.
+3. A latest-10 run requests one page with `offset=0&limit=10`, fetches no more than 10 chat details, and performs no further conversation-list paging. Its first-page sample is not guaranteed globally latest. Full-list mode remains available. Completion reports new chats and newly added message IDs separately.
 4. Every conversation-list page is scanned. On a repeat run, matching list-item `update_time` tokens skip their `conversation/{id}` detail requests.
 5. In **All chats** mode, after the user edits one chat and starts a new chat on chatgpt.com, the next sync reports one new chat and one updated chat, assuming the list item's update token changes for the edit. It separately reports newly added message IDs.
 6. **Stop** finishes the in-flight request/upsert. Already-synced data is kept, and a later run restarts list paging from offset zero.

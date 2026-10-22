@@ -4,9 +4,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { parseConversationNodes, type ChatGptRawConversation } from '../../lib/chatgpt-parse.ts';
 import { HOST_VERSION } from '../../lib/sync/protocol.ts';
-import type { AccountScope, HostStatus, UpsertStatus } from '../../lib/sync/protocol.ts';
+import type { AccountScope, HostStatus, ProjectSyncOutcome, UpsertStatus } from '../../lib/sync/protocol.ts';
+import { checkProjectCatalogSize, projectItemJson, projectMetadata } from '../../lib/project-catalog.ts';
+import type { ProjectItem } from '../../lib/project-catalog.ts';
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const MAX_CONVERSATION_BYTES = 60 * 1024 * 1024;
 const MAX_SYNC_DIFF_BYTES = 5 * 1024 * 1024;
 const MAX_SYNC_DIFF_PATHS = 64;
@@ -45,7 +47,8 @@ export class HostOperationError extends Error {
 
 export interface HostDatabase {
   status(): HostStatus;
-  beginRun(runId: string, mode: 'single' | 'incremental', account: AccountScope): { runId: string; accountId: string };
+  beginRun(runId: string, mode: 'single' | 'incremental', account: AccountScope, projectCatalog?: boolean): { runId: string; accountId: string };
+  commitProjectCatalog(runId: string, items: ProjectItem[]): { count: number };
   diffManifest(
     runId: string,
     items: Array<{ conversationId: string; updateTimeToken: string | null }>,
@@ -65,6 +68,7 @@ export interface HostDatabase {
     runId: string,
     cancelled: boolean,
     failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>,
+    projects?: ProjectSyncOutcome,
   ): {
     runId: string;
     status: 'completed' | 'failed' | 'cancelled';
@@ -279,6 +283,38 @@ export function openDatabase(directory: string): HostDatabase {
         INSERT INTO schema_migrations(version, applied_at) VALUES (3, '${new Date().toISOString()}');
       `);
     }
+    if (typeof version !== 'number' || version < 4) {
+      db.exec(`
+        CREATE TABLE projects(
+          account_id TEXT NOT NULL REFERENCES accounts(id),
+          id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          gizmo_type TEXT NOT NULL,
+          remote_created_at TEXT,
+          remote_updated_at TEXT,
+          remote_last_interacted_at TEXT,
+          is_archived INTEGER CHECK(is_archived IN (0, 1)),
+          raw_json TEXT NOT NULL,
+          raw_sha256 TEXT NOT NULL,
+          first_synced_at TEXT NOT NULL,
+          last_synced_at TEXT NOT NULL,
+          last_seen_run_id TEXT NOT NULL REFERENCES sync_runs(id),
+          PRIMARY KEY(account_id, id)
+        );
+        CREATE TABLE project_catalog_state(
+          account_id TEXT PRIMARY KEY REFERENCES accounts(id),
+          last_attempt_run_id TEXT NOT NULL REFERENCES sync_runs(id),
+          last_attempt_at TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
+          error_category TEXT,
+          last_successful_run_id TEXT REFERENCES sync_runs(id),
+          last_successful_at TEXT,
+          observed_count INTEGER
+        );
+        INSERT INTO schema_migrations(version, applied_at) VALUES (4, '${new Date().toISOString()}');
+      `);
+    }
     db.prepare("UPDATE meta SET value = ? WHERE key = 'host_version'").run(HOST_VERSION);
     db.exec('COMMIT');
   } catch (error) {
@@ -299,13 +335,16 @@ export function openDatabase(directory: string): HostDatabase {
       return {
         hostVersion: HOST_VERSION, protocolRange: [1, 1],
         capabilities: [
-          'ping', 'echo', 'status', 'single-chat-sync', 'all-chat-sync', 'message-change-counts',
+          'ping', 'echo', 'status', 'single-chat-sync', 'all-chat-sync', 'message-change-counts', 'project-catalog',
         ], dbPath: path,
         schemaVersion: SCHEMA_VERSION, installId,
         counts: { conversations: Number(counts.conversations), messages: Number(counts.messages) },
       };
     },
-    beginRun(runId: string, mode: 'single' | 'incremental', account: AccountScope) {
+    beginRun(runId: string, mode: 'single' | 'incremental', account: AccountScope, projectCatalog = false) {
+      if (projectCatalog && mode !== 'incremental') {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Project metadata requires an incremental run.');
+      }
       const accountId = accountIdFor(account);
       const now = new Date().toISOString();
       db.exec('BEGIN IMMEDIATE');
@@ -324,6 +363,12 @@ export function openDatabase(directory: string): HostDatabase {
           INSERT INTO sync_runs(id, account_id, owner_id, mode, started_at, status, listed)
           VALUES (?, ?, ?, ?, ?, 'running', ?)
         `).run(runId, accountId, ownerId, mode, now, mode === 'single' ? 1 : 0);
+        if (projectCatalog) {
+          db.prepare(`INSERT INTO project_catalog_state(account_id, last_attempt_run_id, last_attempt_at, status)
+            VALUES (?, ?, ?, 'running') ON CONFLICT(account_id) DO UPDATE SET
+            last_attempt_run_id = excluded.last_attempt_run_id, last_attempt_at = excluded.last_attempt_at,
+            status = 'running', error_category = NULL`).run(accountId, runId, now);
+        }
         db.exec('COMMIT');
         return { runId, accountId };
       } catch (error) {
@@ -334,6 +379,54 @@ export function openDatabase(directory: string): HostDatabase {
         }
         throw error;
       }
+    },
+    commitProjectCatalog(runId: string, items: ProjectItem[]) {
+      const run = db.prepare(`SELECT r.account_id, a.workspace_id FROM sync_runs r
+        JOIN accounts a ON a.id = r.account_id JOIN project_catalog_state s ON s.account_id = r.account_id
+        WHERE r.id = ? AND r.owner_id = ? AND r.status = 'running' AND r.mode = 'incremental'
+          AND s.last_attempt_run_id = r.id AND s.status = 'running'`).get(runId, ownerId);
+      if (!run || typeof run.account_id !== 'string') {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Project catalog run is not active or owned by this host.');
+      }
+      checkProjectCatalogSize(runId, items);
+      const ids = new Set<string>();
+      const records = items.map(item => {
+        const metadata = projectMetadata(item.raw);
+        const json = projectItemJson(item.raw);
+        if (ids.has(metadata.id) || createHash('sha256').update(json).digest('hex') !== item.sha256) {
+          throw new HostOperationError('INVALID_PAYLOAD', 'Project ID is duplicated or SHA-256 does not match.');
+        }
+        if (metadata.workspaceId !== null && metadata.workspaceId !== run.workspace_id) {
+          throw new HostOperationError('ACCOUNT_MISMATCH', 'Project belongs to a different workspace.');
+        }
+        ids.add(metadata.id);
+        return { metadata, json, hash: item.sha256 };
+      });
+      const now = new Date().toISOString();
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        const insert = db.prepare(`INSERT INTO projects(account_id, id, name, description, gizmo_type,
+          remote_created_at, remote_updated_at, remote_last_interacted_at, is_archived,
+          raw_json, raw_sha256, first_synced_at, last_synced_at, last_seen_run_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(account_id, id) DO UPDATE SET name = excluded.name, description = excluded.description,
+          gizmo_type = excluded.gizmo_type, remote_created_at = excluded.remote_created_at,
+          remote_updated_at = excluded.remote_updated_at, remote_last_interacted_at = excluded.remote_last_interacted_at,
+          is_archived = excluded.is_archived, raw_json = excluded.raw_json, raw_sha256 = excluded.raw_sha256,
+          last_synced_at = excluded.last_synced_at, last_seen_run_id = excluded.last_seen_run_id`);
+        for (const { metadata: m, json, hash } of records) {
+          insert.run(run.account_id, m.id, m.name, m.description, m.gizmoType, m.createdAt, m.updatedAt,
+            m.lastInteractedAt, m.archived === null ? null : Number(m.archived), json, hash, now, now, runId);
+        }
+        db.prepare(`UPDATE project_catalog_state SET status = 'completed', error_category = NULL,
+          last_successful_run_id = ?, last_successful_at = ?, observed_count = ?
+          WHERE account_id = ?`).run(runId, now, records.length, run.account_id);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+      return { count: records.length };
     },
     diffManifest(
       runId: string,
@@ -540,11 +633,20 @@ export function openDatabase(directory: string): HostDatabase {
       runId: string,
       cancelled: boolean,
       failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>,
+      projects?: ProjectSyncOutcome,
     ) {
-      const run = db.prepare("SELECT listed, new, updated, unchanged FROM sync_runs WHERE id = ? AND status = 'running'").get(runId);
+      const run = db.prepare("SELECT account_id, listed, new, updated, unchanged FROM sync_runs WHERE id = ? AND owner_id = ? AND status = 'running'").get(runId, ownerId);
       if (!run) throw new HostOperationError('INVALID_PAYLOAD', 'Sync run is not active.');
+      const catalog = db.prepare('SELECT * FROM project_catalog_state WHERE last_attempt_run_id = ?').get(runId);
+      if (catalog && !projects || !catalog && projects ||
+        projects?.status === 'cancelled' && !cancelled ||
+        catalog && projects?.status === 'completed' &&
+          (catalog.status !== 'completed' || catalog.observed_count !== projects.count) ||
+        catalog && projects && projects.status !== 'completed' && catalog.status === 'completed') {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Project outcome does not match the committed catalog.');
+      }
       const now = new Date().toISOString();
-      const status = cancelled ? 'cancelled' : failures.length ? 'failed' : 'completed';
+      const status = cancelled ? 'cancelled' : failures.length || projects?.status === 'failed' ? 'failed' : 'completed';
       db.exec('BEGIN IMMEDIATE');
       try {
         const insertFailure = db.prepare(`
@@ -552,6 +654,14 @@ export function openDatabase(directory: string): HostDatabase {
         `);
         for (const failure of failures) {
           insertFailure.run(runId, failure.conversationId, failure.error.slice(0, 1000), failure.retryable ? 1 : 0);
+        }
+        if (projects && projects.status !== 'completed') {
+          db.prepare(`UPDATE project_catalog_state SET status = ?, error_category = ?
+            WHERE last_attempt_run_id = ? AND status = 'running'`)
+            .run(projects.status, projects.category, runId);
+          if (projects.status === 'failed') {
+            insertFailure.run(runId, null, `Project metadata sync failed: ${projects.category}.`, 1);
+          }
         }
         db.prepare(`
           UPDATE sync_runs SET ended_at = ?, status = ?, failed = ?, cancelled = ?
@@ -567,6 +677,9 @@ export function openDatabase(directory: string): HostDatabase {
         for (const failure of failures) {
           const category = syncFailureCategory(failure.error);
           categories[category] = (categories[category] ?? 0) + 1;
+        }
+        if (projects?.status === 'failed') {
+          console.info('PROJECT_SYNC_FAILURE', JSON.stringify({ category: projects.category }));
         }
         console.info('SYNC_RUN_FAILURE', JSON.stringify({
           status,
@@ -604,6 +717,8 @@ export function openDatabase(directory: string): HostDatabase {
               if (typeof run.id !== 'string') continue;
               failRun.run(now, run.id);
               addFailure.run(run.id);
+              db.prepare(`UPDATE project_catalog_state SET status = 'failed', error_category = 'local-host'
+                WHERE last_attempt_run_id = ? AND status = 'running'`).run(run.id);
             }
             db.exec('COMMIT');
           } catch (error) {
