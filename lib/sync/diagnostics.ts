@@ -32,3 +32,11 @@ export async function echoHost(): Promise<EchoResult> {
 export function recordApiProbe(report: ApiProbeReport): Promise<{ probeId: string; logged: true }> {
   return client.request('recordApiProbe', report);
 }
+
+export function launchLocalViewer(): Promise<{ url: string }> {
+  return client.request('launchViewer', {});
+}
+
+export function retainViewerHost(): () => void {
+  return client.retain();
+}

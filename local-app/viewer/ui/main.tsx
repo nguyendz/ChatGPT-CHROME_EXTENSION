@@ -213,8 +213,6 @@ function App() {
             <span>{status ? `${status.conversations} conversations` : 'Local SQLite archive'}</span>
             <span>Last sync {status?.lastSyncAt ? date(status.lastSyncAt) : status ? 'Never' : 'Unavailable'}</span>
           </div>
-          {status && <p>{status.messages} stored messages</p>}
-          <p>No ChatGPT connection required.</p>
         </footer>
       </aside>
       <main className="reader" ref={transcript} tabIndex={-1}>

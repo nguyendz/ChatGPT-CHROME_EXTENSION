@@ -17,7 +17,8 @@ database through a Chrome Native Messaging host.
   updated, unchanged, and failed chat counts.
 - **Stop** finishes the current request/upsert and preserves conversations
   already committed. A later run starts the list scan again from the beginning.
-- **Open** expands the local-sync details, including **Sync this chat**,
+- **Open local viewer** launches the read-only archive in a browser tab.
+  **Open** expands the local-sync details, including **Sync this chat**,
   connection status, and diagnostics.
 - A safe-URL-only change refreshes conversation metadata without rewriting
   message rows; an identical payload is a no-op.
@@ -45,19 +46,24 @@ conversation. These commands open the database read-only.
 
 ## Local archive viewer (Wave 6A)
 
-Browse synced chats in a separate localhost browser app:
+Build the viewer UI once from the repository:
 
 ```powershell
 corepack pnpm viewer:build
-corepack pnpm viewer
 ```
 
-Node.js 24 or newer is required. Open the **full private URL** printed by the
-command. Keep that terminal running; press Ctrl+C to stop the viewer. The
-viewer binds only to `127.0.0.1` on a randomly assigned port, not your LAN.
-It reads `%LOCALAPPDATA%\ChatGPTBackup\sync.db`; set `CHATGPT_SYNC_DATA_DIR`
-before starting to use another archive directory. It never creates a missing
-database, migrates its schema, or starts a sync.
+With the local native host registered, choose **Open local viewer** in the
+extension. Node.js 24 or newer is required. The viewer binds only to
+`127.0.0.1` on a randomly assigned port, not your LAN. It reads
+`%LOCALAPPDATA%\ChatGPTBackup\sync.db`; set `CHATGPT_SYNC_DATA_DIR` before
+starting the host to use another archive directory. It never creates a missing
+database, migrates its schema, or starts a sync. The extension keeps the viewer
+available while at least one viewer tab remains open; closing the last tab
+stops the local server within about 30 seconds.
+
+To start it manually instead, run `corepack pnpm viewer` and open the full
+private URL printed by the command. Keep that terminal running; press Ctrl+C
+to stop the viewer.
 
 - Select an archive account and a conversation to read its active branch.
   Message order follows the saved mapping tree, not timestamps.
@@ -109,9 +115,10 @@ renames refresh even when all chat update tokens match. Latest-10 still fetches
 at most ten selected conversation details. Sidebar conversation previews are
 not imported as full chats or used as remote totals.
 
-Reload the built extension and restart the viewer after updating. Host v0.5.0
-owns the transactional schema 3 -> 4 migration; older hosts are rejected before
-an incremental run starts. Existing chats/messages are preserved.
+Reload the built extension and re-register the host after updating. The
+extension-launched viewer requires host v0.6.0 or newer. Host v0.5.0 introduced
+the transactional schema 3 -> 4 migration; older hosts are rejected before an
+incremental run starts. Existing chats/messages are preserved.
 
 Project sync checks the session user/workspace/token before and after fetching
 metadata and rejects non-null project workspace mismatches. This detects scope

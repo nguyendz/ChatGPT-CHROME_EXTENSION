@@ -336,6 +336,7 @@ export function openDatabase(directory: string): HostDatabase {
         hostVersion: HOST_VERSION, protocolRange: [1, 1],
         capabilities: [
           'ping', 'echo', 'status', 'single-chat-sync', 'all-chat-sync', 'message-change-counts', 'project-catalog',
+          'local-viewer',
         ], dbPath: path,
         schemaVersion: SCHEMA_VERSION, installId,
         counts: { conversations: Number(counts.conversations), messages: Number(counts.messages) },

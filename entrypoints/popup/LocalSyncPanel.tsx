@@ -53,7 +53,7 @@ function isRunResult(value: unknown): value is AllChatSyncResult {
 
 export function LocalSyncPanel() {
   const [status, setStatus] = useState<ConnectionStatus>();
-  const [action, setAction] = useState<'connection' | 'echo' | 'sync-current' | 'sync-all' | 'probe'>();
+  const [action, setAction] = useState<'connection' | 'echo' | 'sync-current' | 'sync-all' | 'probe' | 'viewer'>();
   const [check, setCheck] = useState({ count: 0, completedAt: '' });
   const [feedback, setFeedback] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -239,6 +239,21 @@ export function LocalSyncPanel() {
     }
   }
 
+  async function openViewer() {
+    setAction('viewer');
+    setFeedback('');
+    try {
+      const result = await diagnostic<{ opened: boolean } & { error?: string }>('openArchiveViewer');
+      if (result.error) throw new Error(result.error);
+      if (!result.opened) throw new Error('The browser did not confirm that the viewer tab opened.');
+      setFeedback('Local archive viewer opened in a new tab. Closing its last tab stops the local viewer.');
+    } catch (error) {
+      setFeedback(`Viewer launch failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setAction(undefined);
+    }
+  }
+
   async function copyPath() {
     try {
       await navigator.clipboard.writeText(status?.host?.dbPath ?? '');
@@ -278,6 +293,9 @@ export function LocalSyncPanel() {
           Open
         </Button>
       </div>
+      <Button type="button" size="lg" variant="outline" disabled={busy} onClick={openViewer} className="h-10 w-full">
+        {action === 'viewer' ? 'Opening viewer...' : 'Open local viewer'}
+      </Button>
       <p className="min-h-4 break-all text-xs text-[#4B5563]" role="status" aria-live="polite">{feedback}</p>
       {syncProgress && <div className="rounded-md border border-[#C6F0E5] bg-[#E7F2E8]/45 p-2 text-xs text-[#215145]" role="status" aria-live="polite">
         <p className="font-bold">{syncProgress.phase === 'projects' ? 'Syncing project information' :
@@ -286,7 +304,7 @@ export function LocalSyncPanel() {
         <p>{syncProgress.selected === null ? 'Chat selection pending' : `${syncProgress.selected} selected`}; processed {syncProgress.processed}; new chats {syncProgress.new}; new messages {syncProgress.newMessages}; updated {syncProgress.updated}; unchanged {syncProgress.unchanged}; failed {syncProgress.failed}.</p>
       </div>}
       <details id="local-sync-details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className="rounded-lg border border-[#C6F0E5] bg-white p-3 text-xs text-[#215145]">
-        <summary className="cursor-pointer font-bold">Local sync: {action === 'connection' ? 'Checking...' : action === 'sync-current' ? 'Syncing chat...' : action === 'sync-all' ? 'Syncing all chats...' : status ? labels[status.state] : 'Not tested'}</summary>
+        <summary className="cursor-pointer font-bold">Local sync: {action === 'connection' ? 'Checking...' : action === 'sync-current' ? 'Syncing chat...' : action === 'sync-all' ? 'Syncing all chats...' : action === 'viewer' ? 'Opening viewer...' : status ? labels[status.state] : 'Not tested'}</summary>
         <div className="mt-3 space-y-2">
           <p>Sync the currently open saved ChatGPT conversation to the local database.</p>
           <Button size="sm" disabled={busy} onClick={syncCurrentChat}>{action === 'sync-current' ? 'Syncing chat...' : 'Sync this chat'}</Button>

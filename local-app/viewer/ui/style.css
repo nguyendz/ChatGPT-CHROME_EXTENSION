@@ -31,7 +31,6 @@ select { width: 100%; padding: 9px; border: 1px solid #d8e1d8; border-radius: 7p
 .chat-item strong .message-count { display: inline; margin: 0; color: #718078; font-size: 10px; font-weight: 400; }
 .sidebar footer { flex-shrink: 0; padding: 15px 20px; border-top: 1px solid #dfe7df; color: #7b897e; font-size: 10px; }
 .sidebar-footer-summary { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
-.sidebar footer p { margin-top: 4px; }
 .reader { min-width: 0; flex: 1; overflow: auto; background: #fff; }
 .welcome { min-height: 80%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; max-width: 700px; margin: auto; }
 .welcome-icon { display: grid; place-items: center; width: 64px; height: 64px; background: #eff4ed; border: 1px solid #e0e8dc; border-radius: 20px; font: 22px Georgia, serif; color: #568268; margin-bottom: 26px; }

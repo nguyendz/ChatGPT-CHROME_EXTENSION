@@ -1,5 +1,5 @@
 export const HOST_NAME = 'com.chatgpt_backup.sync';
-export const HOST_VERSION = '0.5.0';
+export const HOST_VERSION = '0.6.0';
 export const PROTOCOL_VERSION = 1;
 export const MAX_HOST_TO_EXT_BYTES = 1_000_000;
 export const MAX_EXT_TO_HOST_BYTES = 64 * 1024 * 1024;
@@ -30,7 +30,7 @@ export function isProjectSyncOutcome(value: unknown): value is ProjectSyncOutcom
 
 export type ErrorCode = 'PROTOCOL_MISMATCH' | 'BUSY' | 'INVALID_PAYLOAD' |
   'UNKNOWN_TYPE' | 'TOO_LARGE' | 'DB_ERROR' | 'DISK_FULL' |
-  'ACCOUNT_MISMATCH' | 'FORBIDDEN_ORIGIN' | 'LOG_ERROR';
+  'ACCOUNT_MISMATCH' | 'FORBIDDEN_ORIGIN' | 'LOG_ERROR' | 'VIEWER_ERROR';
 
 export type ApiProbeRouteKind = 'conversation' | 'project-conversation' | 'other';
 export type ApiProbeOrder = 'descending' | 'not-descending' | 'inconclusive';
@@ -68,6 +68,7 @@ export type RequestPayloads = {
   echo: { data: string };
   hello: { protocolVersion: number; extVersion: string };
   getStatus: Record<string, never>;
+  launchViewer: Record<string, never>;
   recordApiProbe: ApiProbeReport;
   recordApiDebug: ApiDebugChunk;
   beginRun: { runId: string; mode: 'single' | 'incremental'; account: AccountScope; projectCatalog?: boolean };
@@ -106,6 +107,7 @@ export type ResponsePayloads = {
   echo: { bytes: number; sha256: string };
   hello: HostStatus;
   getStatus: HostStatus;
+  launchViewer: { url: string };
   recordApiProbe: { probeId: string; logged: true };
   recordApiDebug: { entryId: string; part: number; logged: true };
   beginRun: { runId: string; accountId: string };
@@ -146,6 +148,16 @@ export type EchoResult = { bytes: number; sha256: string; matches: boolean };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isViewerLaunchUrl(value: string): boolean {
+  if (!/^http:\/\/127\.0\.0\.1:\d{1,5}\/#token=[a-f0-9]{64}$/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return Number(url.port) > 0 && url.pathname === '/' && url.search === '';
+  } catch {
+    return false;
+  }
 }
 
 export function isHostStatus(value: unknown): value is HostStatus {
@@ -228,6 +240,8 @@ export function isResponsePayload<K extends keyof ResponsePayloads>(
     typeof value.entryId === 'string' && typeof value.part === 'number' &&
     Number.isSafeInteger(value.part) && value.part >= 0 && value.logged === true;
   if (!isRecord(value)) return false;
+  if (type === 'launchViewer') return hasExactKeys(value, ['url']) &&
+    typeof value.url === 'string' && isViewerLaunchUrl(value.url);
   if (type === 'echo') return typeof value.bytes === 'number' && typeof value.sha256 === 'string';
   if (type === 'beginRun') return typeof value.runId === 'string' && typeof value.accountId === 'string';
   if (type === 'commitProjectCatalog') return typeof value.count === 'number' &&

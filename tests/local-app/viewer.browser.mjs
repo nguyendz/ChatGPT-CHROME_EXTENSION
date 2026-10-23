@@ -96,6 +96,7 @@ try {
   assert.equal(await evaluate('document.querySelector(".chat-item").textContent.includes("Updated") || document.querySelector(".chat-item").textContent.includes("Synced")'), false);
   assert.match(await evaluate('document.querySelector(".sidebar-footer-summary").innerText.replace(/\\s+/g, " ")'), /^\d+ conversations\s+Last sync /);
   assert.equal(await evaluate('document.querySelector(".sidebar-footer-summary").textContent.includes("Never")'), false);
+  assert.equal(await evaluate('document.querySelector("aside.sidebar footer").textContent.includes("stored messages") || document.querySelector("aside.sidebar footer").textContent.includes("No ChatGPT connection required")'), false);
   assert.equal(await evaluate('location.hash'), '', 'Launch token must be removed from the address bar');
   assert.equal(await evaluate('document.body.innerText.includes("Local only / Read-only")'), true);
   await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Load more conversations').click()`);

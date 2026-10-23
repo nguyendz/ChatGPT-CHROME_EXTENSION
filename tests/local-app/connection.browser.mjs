@@ -101,9 +101,10 @@ try {
   assert.equal(status.state, 'connected', JSON.stringify(status));
   assert.equal(await evaluate('chrome.runtime.getManifest().permissions.includes("downloads")'), false);
   assert.equal(status.host.schemaVersion, 4);
-  assert.equal(status.host.hostVersion, '0.5.0');
+  assert.equal(status.host.hostVersion, '0.6.0');
   assert.equal(status.host.capabilities.includes('message-change-counts'), true);
   assert.equal(status.host.capabilities.includes('project-catalog'), true);
+  assert.equal(status.host.capabilities.includes('local-viewer'), true);
   assert.equal(status.host.dbPath, join(dataDirectory, 'sync.db'));
   await evaluate(`document.querySelector('details details').open = true; [...document.querySelectorAll('button')].find(b => b.textContent === 'Echo 10 MB').click()`);
   await until('document.body.innerText.includes("10 MB verified.")');

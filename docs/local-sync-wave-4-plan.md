@@ -45,6 +45,35 @@ the metadata work is W4.0, with detailed subtasks W4.0-P1–P6.
 | 4B | W4.2, W4.3, then W4.1 | Verified default/archived/project coverage supports safe manual full reconciliation. |
 | 4C | W4.6, W4.4, W4.5 | Explicit account selection and non-overlapping scheduled/live sync; weekly full runs require the 4B gate. |
 
+## Progress tracker 2026-10-23
+
+**Overall: in progress.** 4A implementation and automated verification are
+complete; its signed-in acceptance is still open. 4B and 4C have not started.
+“Done” below means the implementation/test gate is met, not that live endpoint
+coverage or signed-in acceptance has been proven. Status is based on the
+implementation checkpoint below and the acceptance evidence recorded here.
+
+| Task | Status | Done | Remaining / next gate |
+|---|---|---|---|
+| W4.0-P1 — contract and fixtures | Done | Sidebar response shape and sanitized synthetic contract are documented and tested. | Live endpoint workspace selection and root-cursor continuation are unverified; record evidence during signed-in acceptance. |
+| W4.0-P2 — parser and paging | Done, fail-closed | Parser, validation, bounded handling, diagnostics, and failure behavior are implemented and automatically tested. | Root continuation is deliberately unsupported: a non-null cursor reports `pagination-unverified` and retains the prior catalog. Do not describe this as full project enumeration. |
+| W4.0-P3 — host storage/protocol | Done | Schema 3→4 catalog storage, run ownership, bounds, hash validation, and transaction behavior are implemented and tested. | No known implementation task remains for 4A host storage. |
+| W4.0-P4 — sync integration/UI | Done | Metadata sync is integrated with Latest-10/All-chats, including no-op chat runs and separate project outcomes. | No known implementation task remains for 4A integration. |
+| W4.0-P5 — offline viewer | Done | Schema 3/4 read support, account-scoped names/details, zero-chat projects, refresh, and browser checks are implemented. | No known implementation task remains for 4A viewer delivery. |
+| W4.0-P6 — integration/acceptance | In progress | Automated local-sync/viewer tests, type-checks, builds, and isolated Chrome/native-host checks passed at the implementation checkpoint. | Signed-in acceptance remains: validate endpoint account/workspace context, actual labels/refresh/failure behavior, and record the still-unverified coverage limits. |
+| W4.2 — archived coverage | Not started | — | Capture and verify archive request parameters, account scope, pagination termination, visibility, and overlap behavior before implementation. |
+| W4.3 — project-chat coverage | Not started | — | Verify project nested-cursor requests and account scope; then enumerate full chats and deduplicate against other sources. 4A previews are not complete coverage. |
+| W4.1 — full reconciliation | Not started | — | Start only after W4.2 and W4.3 establish complete required-source coverage; implement guarded `markMissing` and default-retention behavior. |
+| W4.6 — account chooser/mismatch UX | Not started | — | 4A has defensive session/scope checks, but the explicit profile chooser and task-level account-switch UX/tests remain. |
+| W4.4 — scheduled sync | Not started | — | Add opt-in, non-overlapping scheduled incremental sync after W4.6. Enable weekly full runs only after W4.1 passes. |
+| W4.5 — live sync | Not started | — | Add debounced finished-reply/navigation sync through the single-chat path, sharing account selection and writer locks. |
+
+**Next gates:** complete W4.0-P6 signed-in acceptance; verify W4.2 and W4.3
+coverage evidence (they can proceed independently); implement W4.1 only after
+both coverage gates pass. W4.6 can proceed independently; W4.4/W4.5 follow its
+account-selection and writer-lock requirements. Wave 4 is not complete until
+all three phase gates and the full-wave acceptance criteria below pass.
+
 Phases describe deliveries, not a mandatory serial implementation order.
 W4.6 can start alongside 4A; 4A/4B use existing account identity/locking and
 must not wait for the new profile chooser. W4.4's incremental scheduler and
@@ -291,9 +320,9 @@ responses; do not add a second raw-page storage subsystem.
 
 ## Phase 4A implementation sequence
 
-P1–P5 implementation is complete. P1's sample contract is verified; live
-workspace and root-continuation observations remain open. P6 automated checks
-pass; its signed-in acceptance remains pending.
+See the [progress tracker](#progress-tracker-2026-10-23): P1–P5
+implementation and automated checks are complete. Live workspace and
+root-continuation evidence, plus P6 signed-in acceptance, remain open.
 
 | ID | Work / likely files | Depends on | Done when |
 |---|---|---|---|

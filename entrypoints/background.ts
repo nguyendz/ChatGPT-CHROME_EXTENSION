@@ -1,15 +1,40 @@
 import { classifyApiProbeRoute, collectChatGptApiProbe } from '@/lib/chatgpt-api-probe';
 import { fetchConversation, loadChatGptAccount, loadToken } from '@/lib/chatgpt-client';
-import { echoHost, getHostStatus, recordApiProbe } from '@/lib/sync/diagnostics';
+import { echoHost, getHostStatus, launchLocalViewer, recordApiProbe, retainViewerHost } from '@/lib/sync/diagnostics';
+import { isViewerLaunchUrl } from '@/lib/sync/protocol';
 import { syncAllConversations } from '@/lib/sync/all-chat';
 import { conversationIdFromUrl, syncCurrentConversation } from '@/lib/sync/single-chat';
 
 type SyncDiagnosticRequest = { message: 'syncHostStatus' | 'syncHostEcho' | 'syncApiProbe' };
 type SyncCurrentChatRequest = { message: 'syncCurrentChat' };
-type BackgroundRequest = SyncDiagnosticRequest | SyncCurrentChatRequest;
+type OpenArchiveViewerRequest = { message: 'openArchiveViewer' };
+type BackgroundRequest = SyncDiagnosticRequest | SyncCurrentChatRequest | OpenArchiveViewerRequest;
 
 export default defineBackground(() => {
   const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+  const viewerTabs = new Set<number>();
+  let releaseViewerHost: (() => void) | undefined;
+
+  chrome.tabs.onRemoved.addListener(tabId => {
+    if (!viewerTabs.delete(tabId) || viewerTabs.size > 0) return;
+    releaseViewerHost?.();
+    releaseViewerHost = undefined;
+  });
+
+  async function openArchiveViewer() {
+    const releaseLaunchHold = retainViewerHost();
+    try {
+      const { url } = await launchLocalViewer();
+      if (!isViewerLaunchUrl(url)) throw new Error('The local host returned an invalid viewer URL.');
+      const tab = await chrome.tabs.create({ url });
+      if (typeof tab.id !== 'number') throw new Error('The browser did not return an ID for the viewer tab.');
+      viewerTabs.add(tab.id);
+      releaseViewerHost ??= retainViewerHost();
+      return { opened: true };
+    } finally {
+      releaseLaunchHold();
+    }
+  }
 
   function isExtensionSender(sender: chrome.runtime.MessageSender): boolean {
     return sender.id === chrome.runtime.id
@@ -114,6 +139,15 @@ export default defineBackground(() => {
       }
       const action = request.message === 'syncHostStatus' ? getHostStatus() : echoHost();
       action.then(sendResponse).catch(error => sendResponse({ error: getErrorMessage(error) }));
+      return true;
+    }
+
+    if (request.message === 'openArchiveViewer') {
+      if (!isExtensionSender(sender)) {
+        sendResponse({ error: 'The local viewer must be opened from the extension popup.' });
+        return false;
+      }
+      openArchiveViewer().then(sendResponse).catch(error => sendResponse({ error: getErrorMessage(error) }));
       return true;
     }
 
