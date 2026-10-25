@@ -305,3 +305,123 @@ export async function fetchConversation(
     return value as ChatGptRawConversation;
   }, signal);
 }
+
+export type AssetDownloadFailure = 'unavailable' | 'failed' | 'too-large' | 'rate-limited' | 'unauthorized';
+
+export class AssetDownloadError extends Error {
+  readonly failure: AssetDownloadFailure;
+
+  constructor(failure: AssetDownloadFailure, message: string) {
+    super(message);
+    this.name = 'AssetDownloadError';
+    this.failure = failure;
+  }
+}
+
+export type FetchedAsset = { bytes: Uint8Array; mime: string | null };
+export type AssetFetchOptions = {
+  maxBytes: number;
+  fileKind: string;
+  downloadIntent?: boolean;
+  signal?: AbortSignal;
+  logApi?: ApiDebugLogger;
+  request?: ChatGptRequestRunner;
+};
+
+const ASSET_URL_ORIGIN = 'https://chatgpt.com';
+
+function assetStatusFailure(status: number, stage: string): AssetDownloadError {
+  if (status === 401) {
+    clearTokenCache();
+    return new AssetDownloadError('unauthorized', `ChatGPT sign-in expired during file ${stage} (HTTP 401).`);
+  }
+  if (status === 429) return new AssetDownloadError('rate-limited', `ChatGPT rate-limited the file ${stage} (HTTP 429).`);
+  if (status === 403 || status === 404 || status === 410) {
+    return new AssetDownloadError('unavailable', `ChatGPT no longer provides this file (HTTP ${status}).`);
+  }
+  return new AssetDownloadError('failed', `ChatGPT file ${stage} failed (HTTP ${status}).`);
+}
+
+async function readLimited(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    throw new AssetDownloadError('too-large', 'File is larger than the allowed size.');
+  }
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length > maxBytes) throw new AssetDownloadError('too-large', 'File is larger than the allowed size.');
+    return bytes;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new AssetDownloadError('too-large', 'File is larger than the allowed size.');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return bytes;
+}
+
+/**
+ * Two-step download: `files/download` returns a short-lived URL, which is fetched next. The bearer token is only
+ * ever sent to chatgpt.com; any other origin is refused until it has been reviewed.
+ */
+export async function fetchAssetFile(
+  token: string, fileId: string, conversationId: string, options: AssetFetchOptions,
+): Promise<FetchedAsset> {
+  if (!/^file[-_][A-Za-z0-9]{1,120}$/.test(fileId) || !/^[a-zA-Z0-9-]{1,128}$/.test(conversationId)) {
+    throw new AssetDownloadError('unavailable', 'Refusing an invalid file or conversation ID.');
+  }
+  const { signal, logApi, fileKind, maxBytes } = options;
+  const run = options.request ?? requestChatGpt;
+  const metadataUrl = `${ASSET_URL_ORIGIN}/backend-api/files/download/${encodeURIComponent(fileId)}` +
+    `?conversation_id=${encodeURIComponent(conversationId)}&inline=false&download_intent=${Boolean(options.downloadIntent)}`;
+  const downloadUrl = await run(async () => {
+    const response = await fetch(metadataUrl, { headers: { authorization: `Bearer ${token}` }, ...(signal ? { signal } : {}) });
+    await logApi?.({ kind: 'asset', fileKind, stage: 'url', status: response.status });
+    if (!response.ok) throw assetStatusFailure(response.status, 'lookup');
+    let value: unknown;
+    try { value = await response.json(); } catch {
+      throw new AssetDownloadError('failed', 'ChatGPT returned an unreadable file lookup response.');
+    }
+    if (!isRecord(value) || value.status !== 'success' || typeof value.download_url !== 'string') {
+      throw new AssetDownloadError('unavailable', 'ChatGPT did not return a download URL for this file.');
+    }
+    return value.download_url;
+  }, signal);
+
+  let target: URL;
+  try { target = new URL(downloadUrl); } catch {
+    throw new AssetDownloadError('failed', 'ChatGPT returned an invalid download URL.');
+  }
+  if (target.origin !== ASSET_URL_ORIGIN) {
+    await logApi?.({ kind: 'asset', fileKind, stage: 'rejected', host: target.hostname, reason: 'unverified-origin' });
+    throw new AssetDownloadError('unavailable', 'The file is hosted on an origin that has not been approved (unverified-origin).');
+  }
+
+  return run(async () => {
+    const response = await fetch(target.toString(), { headers: { authorization: `Bearer ${token}` }, ...(signal ? { signal } : {}) });
+    if (!response.ok) {
+      await logApi?.({ kind: 'asset', fileKind, stage: 'download', status: response.status });
+      throw assetStatusFailure(response.status, 'download');
+    }
+    const bytes = await readLimited(response, maxBytes);
+    const contentType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || null;
+    await logApi?.({
+      kind: 'asset', fileKind, stage: 'download', status: response.status, bytes: bytes.length,
+      ...(contentType ? { contentType: contentType.slice(0, 100) } : {}),
+    });
+    if (bytes.length === 0) throw new AssetDownloadError('unavailable', 'ChatGPT returned an empty file.');
+    return { bytes, mime: contentType };
+  }, signal);
+}

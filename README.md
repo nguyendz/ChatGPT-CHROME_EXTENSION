@@ -23,9 +23,16 @@ database through a Chrome Native Messaging host.
 - A safe-URL-only change refreshes conversation metadata without rewriting
   message rows; an identical payload is a no-op.
 - ChatGPT credentials stay in the extension and are not sent to the local host.
-- Sync is manual. Project/archive reconciliation and automatic sync are not
-  included yet.
-- File downloads and conversation exports are not part of this extension.
+- Sync is manual and always user-started; there is no scheduled or live sync.
+  Project/archive reconciliation is not included yet.
+- Optional **Include images & files** (off by default) also downloads the files
+  that saved chats reference: uploaded and generated images, attachments, and
+  code-interpreter outputs. Files are stored once by SHA-256 under
+  `%LOCALAPPDATA%\ChatGPTBackup\assets`. Limits: 5 MB per file, 10 MB and 50
+  files per run; remaining files, including those of earlier chats, download
+  over later runs. File problems never fail the chat sync. The ChatGPT login
+  token is only sent to chatgpt.com, and signed download URLs are never logged.
+  Requires host v0.7.0 (schema 5).
 
 For local setup, host registration, verification, and removal, see the
 [local development waves](./docs/local-sync-development-waves.md#run-wave-1-locally).
@@ -99,13 +106,28 @@ to stop the viewer.
   disabled. Images become labeled placeholders without downloading anything;
   external links open only after a click in a separate tab. No automatic remote
   requests are made.
-- Attachments are not fetched/rendered, and alternate branches are counted but
-  not shown. Branch navigation, search, and exports are later Wave 6 milestones.
+- Saved images show inline (PNG, JPEG, GIF, WebP) and other files appear as
+  download buttons; SVG and unknown types are never rendered. Files not yet
+  downloaded show their state. Files are read through the authorized viewer API
+  and displayed from local `blob:` URLs, so no remote request is made. Alternate
+  branches are counted but not shown. Branch navigation and search are later
+  Wave 6 milestones.
+- **Export Markdown** (on an open conversation) downloads that chat's active
+  branch as one `.md` file, or as a `.zip` with an `assets/` folder when the
+  chat has saved files. **Export folder to Markdown** (under the folder
+  picker) saves one `.md` file per conversation in the selected folder (plus one
+  shared `assets/` subfolder when needed): Chrome
+  and Edge ask for a destination directory and write into a subfolder named
+  after the viewer folder; other browsers download a `.zip` of the same files.
+  Files contain YAML front matter, role/model headings, and the saved message
+  Markdown verbatim. Exporting re-reads saved data and never changes the DB.
+  Re-exporting into the same directory overwrites files with the same name.
 
-The viewer supports archive schemas 3 and 4; schema 3 retains provisional labels
+The viewer supports archive schemas 3, 4, and 5; older schemas retain provisional labels
 until the host upgrades the archive on its next connection. It reads at most 50 chats or
 100 messages per default page (maximum 100 / 200), with explicit errors for
-responses over 8 MiB or saved raw conversations over 60 MiB. Content is never
+responses over 8 MiB (64 MiB for a single Markdown export) or saved raw
+conversations over 60 MiB. Content is never
 silently truncated.
 
 ### Project information sync (Wave 4A)
@@ -116,7 +138,7 @@ at most ten selected conversation details. Sidebar conversation previews are
 not imported as full chats or used as remote totals.
 
 Reload the built extension and re-register the host after updating. The
-extension-launched viewer requires host v0.6.0 or newer. Host v0.5.0 introduced
+extension-launched viewer requires host v0.6.0 or newer (v0.7.0 for files). Host v0.5.0 introduced
 the transactional schema 3 -> 4 migration; older hosts are rejected before an
 incremental run starts. Existing chats/messages are preserved.
 
@@ -129,8 +151,8 @@ continue after a non-auth project failure, but the overall result reports
 failure and shows project status separately from failed-chat counts.
 
 Full project-chat enumeration, archived coverage, missing/deleted reconciliation,
-scheduled/live sync, and a profile chooser remain unimplemented Wave 4B/4C work.
-No deletion or automatic-sync behavior is enabled.
+and a profile chooser remain unimplemented Wave 4B/4C work; archived coverage and
+scheduled/live sync are descoped. No deletion or automatic-sync behavior is enabled.
 
 Checks:
 

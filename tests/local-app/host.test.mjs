@@ -223,14 +223,14 @@ test('hello bootstraps persistent WAL database; reconnect does not repeat migrat
   const first = await run(t, [hello], { directory });
   const second = await run(t, [hello, frame(request('getStatus'))], { directory });
   assert.equal(first.code, 0);
-  assert.equal(second.values[1].payload.schemaVersion, 4);
+  assert.equal(second.values[1].payload.schemaVersion, 5);
   assert.equal(first.values[0].payload.installId, second.values[0].payload.installId);
   const db = new DatabaseSync(join(directory, 'sync.db'));
   try {
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 4);
-    assert.equal(db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map(row => row.version).join(','), '1,2,3,4');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 5);
+    assert.equal(db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map(row => row.version).join(','), '1,2,3,4,5');
     assert.equal(db.prepare('PRAGMA journal_mode').get().journal_mode, 'wal');
-    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.6.0');
+    assert.equal(db.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.7.0');
   } finally { db.close(); }
 });
 
@@ -251,12 +251,12 @@ test('schema migrations upgrade a version 1 database without replacing metadata'
 
   const { values, code } = await run(t, [frame(request('hello', { protocolVersion: 1, extVersion: 'test' }))], { directory });
   assert.equal(code, 0);
-  assert.equal(values[0].payload.schemaVersion, 4);
+  assert.equal(values[0].payload.schemaVersion, 5);
   const migrated = new DatabaseSync(dbPath);
   try {
     assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'install_id'").get().value, 'preserved-install');
-    assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.6.0');
-    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 4);
+    assert.equal(migrated.prepare("SELECT value FROM meta WHERE key = 'host_version'").get().value, '0.7.0');
+    assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 5);
     assert.equal(migrated.prepare('SELECT COUNT(*) AS n FROM accounts').get().n, 0);
     assert.equal(
       migrated.prepare('PRAGMA table_info(conversations)').all().some(column => column.name === 'list_update_token'),
@@ -295,7 +295,7 @@ test('single-chat protocol inserts, no-ops, updates, and preserves every branch'
   assert.equal(code, 0);
   assert.deepEqual(values.slice(1, 4).map(value => value.payload.status), ['inserted', 'noop', 'updated']);
   assert.deepEqual(values[4].payload.counts, { listed: 1, new: 1, updated: 1, unchanged: 1, failed: 0 });
-  assert.deepEqual(values[5].payload.counts, { conversations: 1, messages: 4 });
+  assert.deepEqual(values[5].payload.counts, { conversations: 1, messages: 4, assets: 0, assetBytes: 0, assetsPending: 0 });
   const syncDiffLine = readFileSync(join(directory, 'logs', 'host.log'), 'utf8')
     .split(/\r?\n/).find(line => line.includes(' info SYNC_DIFF '));
   assert.ok(syncDiffLine);

@@ -7,10 +7,12 @@ import type { ChatGptConversationListItem, ChatGptConversationListPage } from '.
 import { HostClient, HostConnectionError } from './host-client.ts';
 import { ApiDebugLogError, createApiDebugLogger } from './api-debug.ts';
 import type { ApiDebugLogger } from './api-debug.ts';
-import type { AccountScope, RequestPayloads, ResponsePayloads } from './protocol.ts';
+import type { AccountScope, AssetRunSummary, RequestPayloads, ResponsePayloads } from './protocol.ts';
 import type { ProjectSyncOutcome } from './protocol.ts';
 import type { ProjectSidebarPage } from '../project-catalog.ts';
 import { collectProjectCatalog, projectFailure } from './projects.ts';
+import { syncAssets } from './assets.ts';
+import type { AssetProgress, AssetSyncOptions } from './assets.ts';
 
 type HostRequester = Pick<HostClient, 'request' | 'retain'>;
 type SyncFailure = {
@@ -20,7 +22,7 @@ type SyncFailure = {
 };
 
 export type AllChatSyncProgress = {
-  phase: 'projects' | 'listing' | 'syncing';
+  phase: 'projects' | 'listing' | 'syncing' | 'assets';
   listed: number;
   total: number | null;
   selected: number | null;
@@ -31,6 +33,7 @@ export type AllChatSyncProgress = {
   unchanged: number;
   failed: number;
   projects?: ProjectSyncOutcome;
+  assets?: AssetProgress;
 };
 
 export type AllChatSyncResult = {
@@ -43,6 +46,7 @@ export type AllChatSyncResult = {
   error?: string;
   failurePhase?: 'projects' | 'listing' | 'selection' | 'syncing';
   projects?: ProjectSyncOutcome;
+  assets?: AssetRunSummary;
 };
 
 export type AllChatSyncDependencies = {
@@ -56,6 +60,9 @@ export type AllChatSyncDependencies = {
   maxConversations?: number;
   fetchProjects?: (cursor: string | null, signal?: AbortSignal) => Promise<ProjectSidebarPage>;
   verifyScope?: (account: AccountScope, token: string, signal?: AbortSignal) => Promise<void>;
+  includeAssets?: boolean;
+  fetchAsset?: AssetSyncOptions['fetchAsset'];
+  assetLimits?: AssetSyncOptions['limits'];
 };
 
 function abortError() {
@@ -205,6 +212,8 @@ export async function syncAllConversations(
   let runError: string | undefined;
   let failurePhase: AllChatSyncResult['failurePhase'];
   let projects: ProjectSyncOutcome = { status: 'cancelled', category: 'cancelled' };
+  let assetSummary: AssetRunSummary | undefined;
+  const changedIds: string[] = [];
 
   function report(phase: AllChatSyncProgress['phase']) {
     progress.phase = phase;
@@ -223,6 +232,10 @@ export async function syncAllConversations(
       !hostStatus.capabilities.includes('message-change-counts') ||
       !hostStatus.capabilities.includes('project-catalog') || hostStatus.schemaVersion < 4) {
       throw new Error('Update the local sync host before using all-chat sync with project information (schema 4 required).');
+    }
+    if (dependencies.includeAssets &&
+      (!hostStatus.capabilities.includes('asset-sync') || hostStatus.schemaVersion < 5)) {
+      throw new Error('Update the local sync host before downloading images and files (asset-sync, schema 5 required).');
     }
     if (signal?.aborted) {
       return {
@@ -374,6 +387,7 @@ export async function syncAllConversations(
             if (result.status === 'inserted') progress.new++;
             else if (result.status === 'updated') progress.updated++;
             else progress.unchanged++;
+            if (result.status !== 'noop') changedIds.push(candidate.conversationId);
             progress.newMessages += newMessageCount;
             progress.processed++;
           } catch (error) {
@@ -400,11 +414,26 @@ export async function syncAllConversations(
     }
 
     cancelled ||= Boolean(signal?.aborted);
-    const summary = await client.request('endRun', { runId, cancelled, failures, projects });
+    if (dependencies.includeAssets && !cancelled && !fatal && selectedManifest) {
+      progress.assets = { total: 0, processed: 0, bytes: 0 };
+      report('assets');
+      assetSummary = await syncAssets({
+        client, runId, token, signal, logApi, conversationIds: changedIds, includeOthers: true,
+        onProgress: assetProgress => { progress.assets = assetProgress; report('assets'); },
+        ...(dependencies.fetchAsset ? { fetchAsset: dependencies.fetchAsset } : {}),
+        ...(dependencies.assetLimits ? { limits: dependencies.assetLimits } : {}),
+      });
+      cancelled ||= assetSummary.stopped === 'cancelled';
+    }
+    cancelled ||= Boolean(signal?.aborted);
+    const summary = await client.request('endRun', {
+      runId, cancelled, failures, projects, ...(assetSummary ? { assets: assetSummary } : {}),
+    });
     return {
       runId,
       status: summary.status,
       projects,
+      ...(assetSummary ? { assets: assetSummary } : {}),
       counts: {
         listed: progress.listed, selected: selectedCount,
         new: summary.counts.new, newMessages: progress.newMessages,
@@ -430,6 +459,7 @@ export async function syncAllConversations(
         runId,
         cancelled: shouldCancel,
         projects,
+        ...(assetSummary ? { assets: assetSummary } : {}),
         failures: shouldCancel ? failures : [...failures, {
           conversationId: null,
           error: 'All-chat sync could not be completed.',
@@ -440,6 +470,7 @@ export async function syncAllConversations(
         runId,
         status: summary.status,
         projects,
+        ...(assetSummary ? { assets: assetSummary } : {}),
         counts: {
           listed: progress.listed, selected: selectedCount,
           new: summary.counts.new,

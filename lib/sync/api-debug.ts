@@ -6,6 +6,11 @@ export type ApiDebugEvent =
   | { kind: 'response'; url: string; attempt: number; status: number; body: string }
   | { kind: 'network-error'; url: string; attempt: number; error: string }
   | {
+    // Signed download URLs and file bytes are never logged: status, size, MIME and host only.
+    kind: 'asset'; fileKind: string; stage: 'url' | 'download' | 'rejected'; status?: number;
+    bytes?: number; contentType?: string; host?: string; reason?: string;
+  }
+  | {
     kind: 'pagination'; scan: number; offset: number;
     reason: 'start' | 'page' | 'duplicate-id' | 'complete' | 'validation-limit';
     returned?: number; pageTotal?: number; listed?: number;

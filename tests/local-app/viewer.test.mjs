@@ -61,7 +61,7 @@ test('missing and incompatible archives fail explicitly without creating a DB', 
   assert.equal(existsSync(join(path, 'sync.db')), false);
   seedViewer(path);
   const db = new DatabaseSync(join(path, 'sync.db'));
-  db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(5, 'synthetic');
+  db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(6, 'synthetic');
   db.close();
   assert.throws(() => new Archive(path), error => error instanceof ViewerError && error.code === 'INCOMPATIBLE_SCHEMA');
 });
@@ -101,7 +101,7 @@ test('an existing empty archive is distinct from a missing or failed archive', t
   writer.close();
   const archive = new Archive(path);
   try {
-    assert.deepEqual(archive.status(), { schemaVersion: 4, accounts: 0, conversations: 0, messages: 0, lastSyncAt: null });
+    assert.deepEqual(archive.status(), { schemaVersion: 5, accounts: 0, conversations: 0, messages: 0, lastSyncAt: null });
     assert.deepEqual(archive.accounts(), []);
   } finally { archive.close(); }
 });

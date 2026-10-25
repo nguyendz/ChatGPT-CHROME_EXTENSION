@@ -1,8 +1,10 @@
 import { HostClient } from './host-client.ts';
 import { createApiDebugLogger } from './api-debug.ts';
 import type { ApiDebugLogger } from './api-debug.ts';
+import { syncAssets } from './assets.ts';
+import type { AssetSyncOptions } from './assets.ts';
 import type { ChatGptRawConversation } from '../chatgpt-parse.ts';
-import type { AccountScope, RequestPayloads, ResponsePayloads } from './protocol.ts';
+import type { AccountScope, AssetRunSummary, RequestPayloads, ResponsePayloads } from './protocol.ts';
 
 type HostRequester = Pick<HostClient, 'request' | 'retain'>;
 type SyncFailure = { conversationId: string | null; error: string; retryable: boolean };
@@ -13,6 +15,14 @@ export type SingleChatSyncResult = {
   messageCount: number;
   newMessageCount?: number;
   changeKind?: 'metadata-only';
+  assets?: AssetRunSummary;
+};
+
+export type SingleChatAssetOptions = {
+  token: string;
+  signal?: AbortSignal;
+  fetchAsset?: AssetSyncOptions['fetchAsset'];
+  limits?: AssetSyncOptions['limits'];
 };
 
 async function sha256(value: string) {
@@ -58,11 +68,18 @@ export async function syncCurrentConversation(
   account: AccountScope,
   fetchRaw: (logApi: ApiDebugLogger) => Promise<ChatGptRawConversation>,
   client: HostRequester = new HostClient(),
+  assets?: SingleChatAssetOptions,
 ): Promise<SingleChatSyncResult> {
   const runId = crypto.randomUUID();
   const releaseHost = client.retain();
 
   try {
+    if (assets) {
+      const hostStatus = await client.request('getStatus', {});
+      if (!hostStatus.capabilities.includes('asset-sync') || hostStatus.schemaVersion < 5) {
+        throw new Error('Update the local sync host before downloading images and files (asset-sync, schema 5 required).');
+      }
+    }
     await client.request('beginRun', { runId, mode: 'single', account });
 
     let raw: ChatGptRawConversation;
@@ -96,7 +113,19 @@ export async function syncCurrentConversation(
       return finishFailedRun(client, runId, conversationId, error);
     }
 
-    const summary = await client.request('endRun', { runId, cancelled: false, failures: [] });
+    let assetSummary: AssetRunSummary | undefined;
+    if (assets) {
+      assetSummary = await syncAssets({
+        client, runId, token: assets.token, conversationIds: [conversationId], includeOthers: false,
+        logApi: createApiDebugLogger(client, runId),
+        ...(assets.signal ? { signal: assets.signal } : {}),
+        ...(assets.fetchAsset ? { fetchAsset: assets.fetchAsset } : {}),
+        ...(assets.limits ? { limits: assets.limits } : {}),
+      });
+    }
+    const summary = await client.request('endRun', {
+      runId, cancelled: false, failures: [], ...(assetSummary ? { assets: assetSummary } : {}),
+    });
     if (summary.status !== 'completed') {
       throw new Error(`The local host finalized the conversation sync as ${summary.status}.`);
     }
@@ -106,6 +135,7 @@ export async function syncCurrentConversation(
       messageCount: result.messageCount,
       ...(result.newMessageCount === undefined ? {} : { newMessageCount: result.newMessageCount }),
       ...(result.changeKind ? { changeKind: result.changeKind } : {}),
+      ...(assetSummary ? { assets: assetSummary } : {}),
     };
   } finally {
     releaseHost();

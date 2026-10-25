@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { HOST_VERSION, PROTOCOL_VERSION, isApiDebugChunk, isApiProbeReport, isProjectSyncOutcome, isRecord } from '../../lib/sync/protocol.ts';
+import { HOST_VERSION, PROTOCOL_VERSION, isApiDebugChunk, isApiProbeReport, isAssetRunSummary, isProjectSyncOutcome, isRecord } from '../../lib/sync/protocol.ts';
 import { ProjectCatalogError } from '../../lib/project-catalog.ts';
 import { HostOperationError, type HostDatabase } from './db.ts';
 import type { AccountScope, ApiDebugChunk, ErrorCode, HostResponse, ResponsePayloads } from '../../lib/sync/protocol.ts';
@@ -18,6 +18,14 @@ function isAccountScope(value: unknown): value is AccountScope {
     typeof value.workspaceId === 'string' && value.workspaceId.trim().length > 0 &&
     value.workspaceId === value.workspaceId.trim() && value.workspaceId.length <= 512 &&
     (value.email === undefined || typeof value.email === 'string' && value.email.length <= 320);
+}
+
+function isRunId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9-]{1,128}$/.test(value);
+}
+
+function hasKeys(value: Record<string, unknown>, expected: string[]): boolean {
+  return Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));
 }
 
 function isManifestItem(value: unknown): value is { conversationId: string; updateTimeToken: string | null } {
@@ -157,11 +165,73 @@ export function handleRequest(
       !payload.failures.every(failure => isRecord(failure) &&
         (failure.conversationId === null || typeof failure.conversationId === 'string') &&
         typeof failure.error === 'string' && typeof failure.retryable === 'boolean') ||
-      (payload.projects !== undefined && !isProjectSyncOutcome(payload.projects))) {
+      (payload.projects !== undefined && !isProjectSyncOutcome(payload.projects)) ||
+      (payload.assets !== undefined && !isAssetRunSummary(payload.assets))) {
       return errorResponse(id, 'INVALID_PAYLOAD', 'endRun requires a run ID, cancellation state, and valid failures.');
     }
     try {
-      return success(id, type, database().endRun(payload.runId, payload.cancelled, payload.failures, payload.projects));
+      return success(id, type, database().endRun(
+        payload.runId, payload.cancelled, payload.failures, payload.projects, payload.assets,
+      ));
+    } catch (error) {
+      return operationError(id, error);
+    }
+  }
+  if (type === 'listPendingAssets') {
+    if (!hasKeys(payload, ['runId', 'conversationIds', 'includeOthers', 'limit']) || !isRunId(payload.runId) ||
+      !Array.isArray(payload.conversationIds) || typeof payload.includeOthers !== 'boolean' ||
+      typeof payload.limit !== 'number') {
+      return errorResponse(id, 'INVALID_PAYLOAD', 'listPendingAssets requires a run ID, conversation IDs, scope flag, and limit.');
+    }
+    try {
+      return success(id, type, { items: database().listPendingAssets(
+        payload.runId, payload.conversationIds as string[], payload.includeOthers, payload.limit,
+      ) });
+    } catch (error) {
+      return operationError(id, error);
+    }
+  }
+  if (type === 'assetChunk') {
+    if (!hasKeys(payload, ['runId', 'uploadId', 'conversationId', 'fileId', 'seq', 'data']) ||
+      !isRunId(payload.runId) || typeof payload.uploadId !== 'string' || typeof payload.conversationId !== 'string' ||
+      typeof payload.fileId !== 'string' || typeof payload.seq !== 'number' || typeof payload.data !== 'string') {
+      return errorResponse(id, 'INVALID_PAYLOAD', 'assetChunk requires a run, upload, file, sequence number, and base64 data.');
+    }
+    try {
+      return success(id, type, database().assetChunk(
+        payload.runId, payload.uploadId, payload.conversationId, payload.fileId, payload.seq, payload.data,
+      ));
+    } catch (error) {
+      return operationError(id, error);
+    }
+  }
+  if (type === 'assetCommit') {
+    if (!hasKeys(payload, ['runId', 'uploadId', 'conversationId', 'fileId', 'sha256', 'size', 'mime']) ||
+      !isRunId(payload.runId) || typeof payload.uploadId !== 'string' || typeof payload.conversationId !== 'string' ||
+      typeof payload.fileId !== 'string' || typeof payload.sha256 !== 'string' || typeof payload.size !== 'number' ||
+      typeof payload.mime !== 'string') {
+      return errorResponse(id, 'INVALID_PAYLOAD', 'assetCommit requires a run, upload, file, hash, size, and MIME type.');
+    }
+    try {
+      return success(id, type, database().assetCommit(
+        payload.runId, payload.uploadId, payload.conversationId, payload.fileId, payload.sha256, payload.size, payload.mime,
+      ));
+    } catch (error) {
+      return operationError(id, error);
+    }
+  }
+  if (type === 'assetOutcome') {
+    const keys = ['runId', 'conversationId', 'fileId', 'state'].concat(payload.error === undefined ? [] : ['error']);
+    if (!hasKeys(payload, keys) || !isRunId(payload.runId) || typeof payload.conversationId !== 'string' ||
+      typeof payload.fileId !== 'string' ||
+      (payload.state !== 'too-large' && payload.state !== 'unavailable' && payload.state !== 'failed') ||
+      (payload.error !== undefined && (typeof payload.error !== 'string' || payload.error.length > 500))) {
+      return errorResponse(id, 'INVALID_PAYLOAD', 'assetOutcome requires a run, file, and terminal state.');
+    }
+    try {
+      return success(id, type, database().assetOutcome(
+        payload.runId, payload.conversationId, payload.fileId, payload.state, payload.error as string | undefined,
+      ));
     } catch (error) {
       return operationError(id, error);
     }

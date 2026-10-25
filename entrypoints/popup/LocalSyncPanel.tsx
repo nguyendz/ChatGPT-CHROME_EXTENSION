@@ -1,14 +1,38 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { ConnectionStatus, EchoResult } from '@/lib/sync/protocol';
-import { isProjectSyncOutcome } from '@/lib/sync/protocol';
+import type { AssetRunSummary, ConnectionStatus, EchoResult } from '@/lib/sync/protocol';
+import { isAssetRunSummary, isProjectSyncOutcome } from '@/lib/sync/protocol';
 import type { SingleChatSyncResult } from '@/lib/sync/single-chat';
 import type { AllChatSyncProgress, AllChatSyncResult } from '@/lib/sync/all-chat';
 
-async function diagnostic<T>(message: string): Promise<T> {
-  const response: T & { error?: string } = await chrome.runtime.sendMessage({ message });
+async function diagnostic<T>(message: string, extra: Record<string, unknown> = {}): Promise<T> {
+  const response: T & { error?: string } = await chrome.runtime.sendMessage({ message, ...extra });
   if (!response) throw new Error('No response from the background. Reload the extension.');
   return response;
+}
+
+const INCLUDE_ASSETS_KEY = 'localSync.includeAssets';
+
+function formatBytes(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+const assetStopReasons: Record<NonNullable<AssetRunSummary['stopped']>, string> = {
+  cancelled: 'stopped by you',
+  'rate-limited': 'ChatGPT rate-limited file downloads',
+  unauthorized: 'ChatGPT sign-in expired',
+  'local-host': 'the local app was unavailable',
+};
+
+function assetSummaryText(summary?: AssetRunSummary) {
+  if (!summary) return '';
+  const parts = [`${summary.stored + summary.deduplicated} saved${summary.bytes ? ` (${formatBytes(summary.bytes)})` : ''}`];
+  if (summary.skippedTooLarge) parts.push(`${summary.skippedTooLarge} over the 5 MB limit`);
+  if (summary.unavailable) parts.push(`${summary.unavailable} unavailable`);
+  if (summary.failed) parts.push(`${summary.failed} failed`);
+  if (summary.deferred) parts.push(`${summary.deferred} waiting for the next run`);
+  const stopped = summary.stopped ? ` Stopped early: ${assetStopReasons[summary.stopped]}.` : '';
+  return ` Files: ${parts.join(', ')}.${stopped}`;
 }
 
 const labels = {
@@ -29,12 +53,14 @@ function isCount(value: unknown): value is number {
 }
 
 function isProgress(value: unknown): value is AllChatSyncProgress {
-  return isRecord(value) && (value.phase === 'projects' || value.phase === 'listing' || value.phase === 'syncing') &&
+  return isRecord(value) && (value.phase === 'projects' || value.phase === 'listing' || value.phase === 'syncing' || value.phase === 'assets') &&
     isCount(value.listed) && (value.total === null || isCount(value.total)) &&
     (value.selected === null || isCount(value.selected)) &&
     isCount(value.processed) && isCount(value.new) && isCount(value.newMessages) &&
     isCount(value.updated) && isCount(value.unchanged) && isCount(value.failed) &&
-    (value.projects === undefined || isProjectSyncOutcome(value.projects));
+    (value.projects === undefined || isProjectSyncOutcome(value.projects)) &&
+    (value.assets === undefined || isRecord(value.assets) && isCount(value.assets.total) &&
+      isCount(value.assets.processed) && isCount(value.assets.bytes));
 }
 
 function isRunResult(value: unknown): value is AllChatSyncResult {
@@ -46,6 +72,7 @@ function isRunResult(value: unknown): value is AllChatSyncResult {
     isCount(value.counts.updated) && isCount(value.counts.unchanged) &&
     isCount(value.counts.failed) && (value.error === undefined || typeof value.error === 'string') &&
     (value.projects === undefined || isProjectSyncOutcome(value.projects)) &&
+    (value.assets === undefined || isAssetRunSummary(value.assets)) &&
     (value.failurePhase === undefined ||
       value.failurePhase === 'projects' || value.failurePhase === 'listing' ||
       value.failurePhase === 'selection' || value.failurePhase === 'syncing');
@@ -58,10 +85,20 @@ export function LocalSyncPanel() {
   const [feedback, setFeedback] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [syncScope, setSyncScope] = useState<'latest-10' | 'all'>('latest-10');
+  const [includeAssets, setIncludeAssets] = useState(false);
   const [syncProgress, setSyncProgress] = useState<AllChatSyncProgress>();
   const [stopRequested, setStopRequested] = useState(false);
   const syncPort = useRef<chrome.runtime.Port | undefined>(undefined);
   const busy = action !== undefined;
+
+  useEffect(() => {
+    try { setIncludeAssets(localStorage.getItem(INCLUDE_ASSETS_KEY) === '1'); } catch { /* storage unavailable */ }
+  }, []);
+
+  function changeIncludeAssets(value: boolean) {
+    setIncludeAssets(value);
+    try { localStorage.setItem(INCLUDE_ASSETS_KEY, value ? '1' : '0'); } catch { /* storage unavailable */ }
+  }
 
   async function testConnection() {
     setAction('connection');
@@ -96,16 +133,17 @@ export function LocalSyncPanel() {
     setAction('sync-current');
     setFeedback('');
     try {
-      const result = await diagnostic<SingleChatSyncResult & { error?: string }>('syncCurrentChat');
+      const result = await diagnostic<SingleChatSyncResult & { error?: string }>('syncCurrentChat', { includeAssets });
       if (result.error) throw new Error(result.error);
+      const fileHint = assetSummaryText(result.assets);
       if (result.changeKind === 'metadata-only') {
         const count = result.newMessageCount === undefined ? '' : `${result.newMessageCount} new messages; `;
-        setFeedback(`Current chat metadata refreshed; ${count}message rows unchanged (${result.messageCount} total).`);
+        setFeedback(`Current chat metadata refreshed; ${count}message rows unchanged (${result.messageCount} total).${fileHint}`);
         return;
       }
       const label = result.status === 'unchanged' ? 'unchanged' : result.status;
       const count = result.newMessageCount === undefined ? '' : `; ${result.newMessageCount} new messages`;
-      setFeedback(`Current chat ${label}${count} (${result.messageCount} total messages).`);
+      setFeedback(`Current chat ${label}${count} (${result.messageCount} total messages).${fileHint}`);
     } catch (error) {
       setFeedback(`Chat sync failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -176,7 +214,8 @@ export function LocalSyncPanel() {
         const logHint = raw.result.status === 'failed'
           ? ' See sanitized SYNC_RUN_FAILURE details in %LOCALAPPDATA%\\ChatGPTBackup\\logs\\host.log.'
           : '';
-        setFeedback(`All-chat sync ${outcome}: ${selectedSummary}; ${newChatSummary}, ${newMessageSummary}, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.failed} failed.${projectHint}${retryHint}${errorHint}${logHint}`);
+        const fileHint = assetSummaryText(raw.result.assets);
+        setFeedback(`All-chat sync ${outcome}: ${selectedSummary}; ${newChatSummary}, ${newMessageSummary}, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.failed} failed.${projectHint}${fileHint}${retryHint}${errorHint}${logHint}`);
         port.disconnect();
         return;
       }
@@ -202,7 +241,7 @@ export function LocalSyncPanel() {
       }
     });
     try {
-      port.postMessage({ type: 'start', scope: syncScope });
+      port.postMessage({ type: 'start', scope: syncScope, includeAssets });
     } catch (error) {
       settled = true;
       setAction(undefined);
@@ -283,6 +322,19 @@ export function LocalSyncPanel() {
         <p className="text-xs text-[#4B5563]">
           Validation mode requests only the first 10 list entries, without paging. ChatGPT ordering is unverified; these may not be the account-wide latest 10. Project information still syncs.
         </p>
+        <label className="flex items-start gap-2 pt-1 text-xs text-[#215145]">
+          <input
+            type="checkbox"
+            checked={includeAssets}
+            disabled={busy}
+            onChange={event => changeIncludeAssets(event.currentTarget.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-bold">Include images &amp; files</span>
+            <span className="block text-[#4B5563]">Downloads saved chats' images and files, up to 5 MB each and 10 MB / 50 files per run. Earlier chats are backfilled over several runs.</span>
+          </span>
+        </label>
       </div>
       <div className="flex gap-3">
         <Button type="button" size="lg" disabled={(busy && action !== 'sync-all') || stopRequested} onClick={action === 'sync-all' ? stopAllChats : syncAllChats} className="h-11 flex-1 bg-[#10A37F] text-white hover:bg-[#0D8A6C]">
@@ -299,8 +351,10 @@ export function LocalSyncPanel() {
       <p className="min-h-4 break-all text-xs text-[#4B5563]" role="status" aria-live="polite">{feedback}</p>
       {syncProgress && <div className="rounded-md border border-[#C6F0E5] bg-[#E7F2E8]/45 p-2 text-xs text-[#215145]" role="status" aria-live="polite">
         <p className="font-bold">{syncProgress.phase === 'projects' ? 'Syncing project information' :
-          syncProgress.phase === 'listing' ? 'Reading conversation list' : 'Syncing conversations'}{syncProgress.phase !== 'projects' &&
-          (syncProgress.total === null ? ` (${syncProgress.listed} read)` : ` (${syncProgress.listed}/${syncProgress.total})`)}</p>
+          syncProgress.phase === 'listing' ? 'Reading conversation list' :
+          syncProgress.phase === 'assets' ? 'Downloading images and files' : 'Syncing conversations'}{syncProgress.phase !== 'projects' && syncProgress.phase !== 'assets' &&
+          (syncProgress.total === null ? ` (${syncProgress.listed} read)` : ` (${syncProgress.listed}/${syncProgress.total})`)}{syncProgress.phase === 'assets' && syncProgress.assets &&
+          ` (${syncProgress.assets.processed}/${syncProgress.assets.total} · ${formatBytes(syncProgress.assets.bytes)})`}</p>
         <p>{syncProgress.selected === null ? 'Chat selection pending' : `${syncProgress.selected} selected`}; processed {syncProgress.processed}; new chats {syncProgress.new}; new messages {syncProgress.newMessages}; updated {syncProgress.updated}; unchanged {syncProgress.unchanged}; failed {syncProgress.failed}.</p>
       </div>}
       <details id="local-sync-details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className="rounded-lg border border-[#C6F0E5] bg-white p-3 text-xs text-[#215145]">

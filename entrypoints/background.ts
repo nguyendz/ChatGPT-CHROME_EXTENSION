@@ -6,7 +6,7 @@ import { syncAllConversations } from '@/lib/sync/all-chat';
 import { conversationIdFromUrl, syncCurrentConversation } from '@/lib/sync/single-chat';
 
 type SyncDiagnosticRequest = { message: 'syncHostStatus' | 'syncHostEcho' | 'syncApiProbe' };
-type SyncCurrentChatRequest = { message: 'syncCurrentChat' };
+type SyncCurrentChatRequest = { message: 'syncCurrentChat'; includeAssets?: boolean };
 type OpenArchiveViewerRequest = { message: 'openArchiveViewer' };
 type BackgroundRequest = SyncDiagnosticRequest | SyncCurrentChatRequest | OpenArchiveViewerRequest;
 
@@ -81,12 +81,14 @@ export default defineBackground(() => {
       }
       const messageType = (rawMessage as { type: unknown }).type;
       const scope = (rawMessage as { scope?: unknown }).scope;
+      const includeAssets = (rawMessage as { includeAssets?: unknown }).includeAssets;
       if (messageType === 'cancel') {
         controller.abort();
         return;
       }
       if (messageType !== 'start' || started ||
-        (scope !== 'latest-10' && scope !== 'all')) {
+        (scope !== 'latest-10' && scope !== 'all') ||
+        (includeAssets !== undefined && typeof includeAssets !== 'boolean')) {
         send({ type: 'error', message: 'Invalid or repeated sync start request.' });
         return;
       }
@@ -96,6 +98,7 @@ export default defineBackground(() => {
         return syncAllConversations(account, token, {
           signal: controller.signal,
           ...(scope === 'latest-10' ? { maxConversations: 10 } : {}),
+          ...(includeAssets ? { includeAssets: true } : {}),
           onProgress: progress => send({ type: 'progress', progress }),
         });
       })().then(
@@ -127,6 +130,8 @@ export default defineBackground(() => {
           conversationId,
           account,
           logApi => fetchConversation(token, conversationId, 5, 1, undefined, logApi),
+          undefined,
+          (request as SyncCurrentChatRequest).includeAssets === true ? { token } : undefined,
         );
       })().then(sendResponse).catch(error => sendResponse({ error: getErrorMessage(error) }));
       return true;

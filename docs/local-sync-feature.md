@@ -3,9 +3,13 @@
 > **Current implementation:** this is a design reference, not a complete feature
 > inventory. Manual current-chat and incremental sync, local diagnostics, and
 > the separate read-only Wave 6A viewer are implemented. Wave 4A project metadata
-> and viewer labels are implemented with signed-in acceptance pending.
-> Wave 4B/4C coverage/reconciliation, automation, and account-selection work remains planned
-> in the [detailed Wave 4 plan](./local-sync-wave-4-plan.md). Delivery and live
+> and viewer labels are implemented with signed-in acceptance pending. Wave 5
+> image/file download (opt-in per run), viewer display, and Markdown export with
+> files are implemented and automatically verified; signed-in acceptance is
+> pending (see the [Wave 5 plan](./local-sync-wave-5-plan.md)).
+> Wave 4B/4C coverage/reconciliation and account-selection work remains planned
+> in the [detailed Wave 4 plan](./local-sync-wave-4-plan.md); archived-chat
+> coverage and scheduled/live sync are descoped. Delivery and live
 > acceptance status are tracked in the wave plans, not inferred from this design.
 
 | | |
@@ -29,8 +33,8 @@ popup sends the raw conversation to a **local database** owned by a **local app*
 (a native-messaging host; see §10). ChatGPT requests run in the logged-in
 browser session; the access token stays in the extension. The current
 implementation supports manual single-chat and incremental history sync.
-Wave 4 extends it with project metadata, verified multi-source coverage,
-reconciliation, and opt-in automation.
+Wave 4 extends it with project metadata, verified project-chat coverage,
+reconciliation, and account selection; all runs remain user-started.
 
 > **Why a local app?** A Chrome extension cannot open SQLite or other databases
 > or write freely to the file system. A local process owns the database, and
@@ -85,8 +89,8 @@ The current single-chat implementation and future architecture boundaries are:
 | Conversation-list endpoint (future) | Remote **manifest** listing for all-chat sync; not implemented in the current single-chat client. |
 | `fetchConversation(token, id)` with 429/5xx backoff | Fetch changed conversations. |
 | `parseConversationNodes()` | Host-side message-row derivation; the raw payload remains the source of truth. |
-| Attachment/image retrieval | Future asset sync; not implemented. |
-| Project metadata and conversation discovery | Wave 4: 4A saves sidebar names/information for viewer folders; 4B verifies full project/archived chat coverage and reconciliation. Sidebar previews are not full conversations. |
+| Attachment/image retrieval | Wave 5 (implemented; signed-in acceptance pending): two-step `files/download`, opt-in per run; see the [Wave 5 plan](./local-sync-wave-5-plan.md). |
+| Project metadata and conversation discovery | Wave 4: 4A saves sidebar names/information for viewer folders; 4B confirms the default list covers project chats, then adds reconciliation. Sidebar previews are not full conversations. |
 | Popup sync action and native-host acknowledgements | Current single-chat status and failure feedback. |
 
 Current permissions are `activeTab`, `nativeMessaging`, and host
@@ -139,7 +143,7 @@ Current permissions are `activeTab`, `nativeMessaging`, and host
 - **Input validation:** the host validates every message against a schema (size limits, types, protocol version) and rejects unknown message types.
 - **API probe:** an explicit developer action may send only bounded field paths/types and aggregate probe outcomes to the local host log. Raw ChatGPT responses, access tokens, cookies, identifiers, titles, and message content stay in the extension and are not logged.
 - **Data at rest:** the DB is stored in the user profile directory, for example `%LOCALAPPDATA%\ChatGPTBackup\sync.db`. Optional: SQLCipher encryption, or rely on OS disk encryption (document both).
-- **Permissions:** add `nativeMessaging` to the local build. Add `alarms` when auto-sync is built (Wave 4). This is a local-only build, so there is no optional-permission prompt.
+- **Permissions:** add `nativeMessaging` to the local build. No `alarms` permission: scheduled sync is descoped. This is a local-only build, so there is no optional-permission prompt.
 
 ---
 
@@ -191,17 +195,18 @@ ChatGPT's conversation list items expose `id` and `update_time`; the list item's
   precautions. The sanitized API probe and `host.log` remain separate.
 
 ### 6.4 Full reconciliation
-Planned in Wave 4B / W4.1; the weekly scheduling hook is Wave 4C / W4.4.
-Manual reconciliation does not depend on the scheduler. A weekly full run is
-enabled only after both tasks pass their gates:
-- Verify account-scoped coverage of default, archived, and project sources;
-  consume each source to its confirmed terminal condition with no early stop.
-- Deduplicate the completed source union before manifest comparison/detail
+Planned in Wave 4B / W4.1 as a manual, user-started run only (no weekly
+scheduling; W4.4 is descoped):
+- Verify account-scoped coverage of the default list, which includes project
+  chats per the W4.3 evidence; consume it to its confirmed terminal condition
+  with no early stop. Archived coverage (W4.2) is descoped.
+- Deduplicate any additional verified source before manifest comparison/detail
   selection. Latest-10 and All-chats incremental runs do not authorize absence
   reconciliation; only an explicit successful full run does.
 - Mark local conversations absent from that verified scope as
-  `remote_state = 'missing'`, not “confirmed deleted.” Archived chats are not
-  missing merely because they are excluded from the default list.
+  `remote_state = 'missing'`, not “confirmed deleted.” Because archived chats
+  are excluded from the default list, a chat archived after it was saved is
+  also reported as missing ("no longer in your chat list").
 - Unverified/inaccessible coverage, source failures, cancellation, or account
   mismatch prevents missing-state updates. Reappearance clears missing state.
 - Optional: `verifyContent`, which re-fetches everything and compares sha256 to repair local corruption.
@@ -225,18 +230,21 @@ separate from conversation counts. See the
 [Wave 4 plan](./local-sync-wave-4-plan.md) for bounds, contracts, and tests.
 
 ### 6.5 Asset sync (images and attachments)
-- A future asset-sync implementation will need to identify attachment and
-  image `fileId`s.
-- `ext → host hasAssets {fileIds}` → the host returns the missing ones.
-- For each missing asset, a future implementation would fetch it from ChatGPT
-  and stream it to the host in **≤ 4 MB base64 chunks** (`assetChunk {fileId,
-  seq, data}`, then `assetCommit {fileId, sha256, mime, size}`). The host would
-  verify the hash and store the file at `assets/<sha256[0:2]>/<sha256>`, so
-  identical files are stored once.
-- Per-asset and per-run size caps are configurable. The current PDF limits of 15 MB per image and 24 MB total are good starting points.
+Implemented in Wave 5 (signed-in acceptance pending); the [Wave 5 plan](./local-sync-wave-5-plan.md) owns the details:
+- The host derives file references from each stored raw conversation: uploaded
+  and generated images, attachments (with `library_file_id` aliases), and
+  code-interpreter outputs. Earlier chats are backfilled without re-fetching.
+- With the opt-in **Include images & files** checkbox, a user-started run asks
+  `listPendingAssets`, downloads each file through `files/download`, and
+  streams it to the host in **≤ 4 MB base64 chunks** (`assetChunk`, then
+  `assetCommit {sha256, mime, size}`). The host verifies the hash and stores
+  the file at `assets/<sha256[0:2]>/<sha256>`, so identical files are stored once.
+- Limits: 5 MB per asset, 10 MB and 50 assets per run. Over-cap assets are
+  skipped or deferred and reported; asset errors never fail chat sync.
 
 ### 6.6 Single-chat sync (live)
-An optional setting, *"Sync the chat I'm viewing"*: when the content script sees that a reply has finished, or when the user leaves a conversation, the background syncs only that conversation id. This gives near-real-time freshness at low API cost.
+Descoped (Wave 4 / W4.5): no automatic trigger runs when a reply finishes or the
+user navigates. Single-chat sync remains a manual popup action.
 
 ### 6.7 Throttling, resilience, and service-worker lifetime
 - Reuse exponential backoff for 429/5xx responses. All ChatGPT session, list, detail, and API-probe requests are serialized with a two-second minimum quiet interval after each response is read.
@@ -264,8 +272,8 @@ Responses echo `id` and use `type: "<request>.ok"` or `type: "error"` with `{cod
 | `beginRun` | `runId`, `mode: incremental\|full\|single`, `options` | `ok` or `busy` |
 | `diffManifest` | `runId`, `items[{id, update_time, title, project_id?, is_archived?}]` | `new[]`, `changed[]`, `unchanged[]` |
 | `upsertConversation` | `runId`, `conversationId`, `raw` (≤ 60 MiB, else chunked), `sha256` | `status: inserted\|updated\|noop` |
-| `hasAssets` | `fileIds[]` | `missing[]` |
-| `assetChunk` / `assetCommit` | see 6.5 | `ok` / `hashMismatch` |
+| `listPendingAssets` | `runId`, `conversationIds?`, `limit` | `items[]` of pending file references |
+| `assetChunk` / `assetCommit` / `assetOutcome` | see 6.5 | `stored`/`deduplicated` / `hashMismatch` / recorded state |
 | `markMissing` | `runId`, `seenIds` (only for full runs; streamed or summarized) | `markedCount` |
 | `endRun` | `runId`, `stats`, `failures[]`, `cancelled` | `summary` |
 | `cancelRun` | `runId` | `ok` |
@@ -306,8 +314,9 @@ messages(                -- one row per mapping node (all branches)
   content_type, text, create_time, is_on_active_branch
 )
 
-assets(sha256 PK, mime, size, path)
-conversation_assets(conversation_id, file_id, sha256 NULL, kind, name)
+assets(sha256 PK, size, mime, created_at)   -- file at assets/<aa>/<sha256>
+asset_refs(account_id, conversation_id, file_id, kind, node_id, name,
+  declared_mime, declared_size, library_file_id, sha256 NULL, state, attempts, ...)
 
 sync_runs(id PK, account_id, owner_id, mode, started_at, ended_at, status,
           listed, new, updated, unchanged, failed, cancelled)
@@ -336,15 +345,13 @@ schema_migrations(version, applied_at)
 | Account mismatch | ⚠️ "Logged in as a different account than the local DB" → choose or create a profile |
 
 ### Planned sync settings
-- Wave 4C adds controls to the existing local-sync UI, not a mandatory Options
-  page redesign. Account/profile selection must precede automated runs; a
-  changed browser identity never silently changes their storage scope.
+- Wave 4C adds account/profile selection to the existing local-sync UI, not a
+  mandatory Options page redesign. A changed browser identity never silently
+  changes the storage scope.
 - Enable Sync, plus a **Test connection** button showing host version, DB path, and round-trip time.
-- Auto-sync: Off / every 15 min / 30 min / 1 h / 6 h. Uses `chrome.alarms` and runs only if a ChatGPT session token is available.
-- Sync the chat I'm viewing (live).
-- Include images, include attachments, and the max asset size.
-- Include archived chats.
-- Full reconciliation frequency.
+- No auto-sync, scheduled, or live sync: every run is user-started (W4.4/W4.5
+  descoped to avoid unattended API traffic).
+- **Include images & files** checkbox per run (Wave 5); fixed caps of 5 MB per asset, 10 MB and 50 assets per run.
 - Remove local copies of chats deleted on ChatGPT (default **off**).
 - ChatGPT request pacing is fixed at two seconds between completed requests; there is no user-configurable throttle.
 - Read-only info from the host: DB path, DB size, app version.
@@ -399,7 +406,7 @@ The "local app" is two pieces that share one SQLite file:
 | Message edited or response regenerated | New nodes in `mapping` change `update_time` → `changed` → re-upsert. All branches are kept, and `current_node` is updated. |
 | Conversation renamed | Same as above. The title is updated, and the change may show in the list item before the detail payload. |
 | Conversation deleted on ChatGPT | Detected only by full reconciliation → `remote_state='missing'`. Kept locally. |
-| Archived chats | Wave 4B / W4.2 must verify archive parameters and paging; the exact request remains unconfirmed. Archived chats must not become missing solely through default-list absence. |
+| Archived chats | Descoped (W4.2): archived chats are excluded from the default list and are not synced. A chat archived after it was saved keeps its local copy; reconciliation reports it as no longer listed. |
 | Project folders/chats | Wave 4A saves actual folder names/metadata. Wave 4B / W4.3 verifies complete project-conversation enumeration and nested paging, deduplicating against other sources before fetching full details. Do not assume an existing discovery helper establishes coverage. |
 | Very large conversation (> 60 MiB raw) | Send `upsertConversation` in chunks (`begin` / `part` / `commit`). |
 | 429 rate limiting | Exponential backoff (existing). The run pauses and shows "Rate limited, resuming in Xs". |
@@ -422,8 +429,8 @@ Delivery is planned in waves in [local-sync-development-waves.md](./local-sync-d
 | **1 — Milestone 1: local app + communication** | The extension (loaded unpacked) talks to the registered local host. Ping, hello, and a large echo work. The DB file is created. The popup shows the host status. |
 | 2 | API spike plus single-chat sync: the current chat goes into the DB. |
 | 3 | Incremental sync (full-list enumeration, manifest no-ops, runs, Stop); early-stop remains gated on ordering evidence. |
-| 4 | **4A / W4.0:** project catalog and viewer folder labels. **4B / W4.2, W4.3, W4.1:** verified archived/project coverage, then manual reconciliation. **4C / W4.6, W4.4, W4.5:** account selection, scheduled/live sync; weekly full runs require the 4B gate. See the [detailed Wave 4 plan](./local-sync-wave-4-plan.md). |
-| 5 | Assets (images and attachments). |
+| 4 | **4A / W4.0:** project catalog and viewer folder labels. **4B / W4.3, W4.1:** confirmed project-chat coverage in the default list, then manual reconciliation. **4C / W4.6:** account selection. Archived coverage (W4.2) and scheduled/live sync (W4.4, W4.5) are descoped. See the [detailed Wave 4 plan](./local-sync-wave-4-plan.md). |
+| 5 | Assets (images and files): host-derived references, opt-in download per run, viewer display, Markdown export with assets. See the [Wave 5 plan](./local-sync-wave-5-plan.md). |
 | 6 | Local viewer app: search and export from the DB. |
 
 ---

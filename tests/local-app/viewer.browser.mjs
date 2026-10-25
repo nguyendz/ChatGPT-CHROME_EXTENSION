@@ -1,12 +1,14 @@
 // Real Chrome in a disposable profile, using only a synthetic local archive.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startViewer } from '../../local-app/viewer/server.ts';
 import { seedViewer, simpleRaw, writeConversation, scopeA, scopeB } from '../fixtures/viewer-archive.mjs';
+import { assetRaw, ids as assetIds } from '../fixtures/asset-chat.mjs';
 import { projectRaw, projectItem } from '../fixtures/project-catalog.mjs';
 import { openDatabase } from '../../local-app/host/db.ts';
 
@@ -170,6 +172,41 @@ try {
   await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Branch <img')).click()`);
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 3, 'Selecting an already-open chat must not clear it');
 
+  const downloads = join(directory, 'downloads');
+  await mkdir(downloads);
+  await command('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+  const downloaded = async name => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const files = await readdir(downloads);
+      if (files.includes(name)) return readFile(join(downloads, name));
+      await new Promise(accept => setTimeout(accept, 50));
+    }
+    throw new Error(`Download timed out: ${name}; found ${(await readdir(downloads)).join(', ')}`);
+  };
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Export Markdown').click()`);
+  const single = (await downloaded('Branch img src=x onerror=alert(1) (branch-c).md')).toString('utf8');
+  assert.match(single, /^---\ntitle: "Branch <img src=x onerror=alert\(1\)>"/);
+  assert.deepEqual([...single.matchAll(/^## (.+)$/gm)].map(match => match[1]), ['User', 'Assistant', 'Tool']);
+  assert.equal(single.includes('INACTIVE BRANCH ONLY'), false);
+  await chooseFolder('Unnamed project 1');
+  await until('document.querySelectorAll(".chat-item").length === 2');
+  await evaluate('delete window.showDirectoryPicker; window.showDirectoryPicker = undefined');
+  await evaluate(`document.querySelector('.export-folder').click()`);
+  await until('document.querySelector(".export-message")?.textContent.includes("Exported 2 of 2 conversations")');
+  const archiveZip = await downloaded('Unnamed project 1.zip');
+  const names = [];
+  for (let offset = archiveZip.readUInt32LE(archiveZip.length - 6), index = 0; index < archiveZip.readUInt16LE(archiveZip.length - 12); index++) {
+    const length = archiveZip.readUInt16LE(offset + 28);
+    names.push(archiveZip.subarray(offset + 46, offset + 46 + length).toString('utf8'));
+    offset += 46 + length;
+  }
+  assert.deepEqual(names, ['Unnamed project 1/Branch img src=x onerror=alert(1) (branch-c).md', 'Unnamed project 1/Conversation extra-003 (extra-00).md']);
+  assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
+  await chooseFolder('All conversations');
+  await until('document.querySelectorAll(".chat-item").length === 50 && !document.querySelector(".export-message")');
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Branch <img')).click()`);
+  await until('document.querySelectorAll(".message").length === 3');
+
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }, sessionId);
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".sidebar")).display'), 'none');
   assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
@@ -187,7 +224,7 @@ try {
   await until('document.querySelectorAll("#folder-select option").length === 2');
   assert.ok((await evaluate('document.querySelector("#folder-select").selectedOptions[0].textContent.trim()')).startsWith('All conversations ('));
   await chooseFolder('Unnamed project 1');
-  await until('document.querySelector("#folder-select").selectedOptions[0].textContent.trim().startsWith("Unnamed project 1 (")');
+  await until('document.querySelector("#folder-select")?.selectedOptions[0]?.textContent.trim().startsWith("Unnamed project 1 (")');
   assert.equal(await evaluate('document.querySelectorAll(".chat-item").length'), 1);
 
   await evaluate(`document.querySelector('#account').value = [...document.querySelector('#account').options].find(option => option.value !== ${JSON.stringify(accountB)}).value;
@@ -227,7 +264,7 @@ try {
   await evaluate('document.querySelector(".chat-item").click()');
   await until('document.querySelectorAll(".message").length === 3');
   await evaluate('document.querySelector(".header-controls button").click()');
-  await until(`document.querySelector('#folder-select').selectedOptions[0].textContent.trim().startsWith(${JSON.stringify(`${projectName} (`)})`);
+  await until(`document.querySelector('#folder-select')?.selectedOptions[0]?.textContent.trim().startsWith(${JSON.stringify(`${projectName} (`)})`);
   await until('document.querySelectorAll(".message").length === 3');
   assert.equal(await evaluate('document.querySelectorAll("#folder-select option").length'), 7);
   assert.equal(await evaluate('document.querySelectorAll(".section-label, .project-details, #folder-select img, #folder-select script").length'), 0);
@@ -243,6 +280,71 @@ try {
   await chooseFolder('Renamed research');
   await until('document.querySelectorAll(".chat-item").length === 2');
   assert.equal(await evaluate('document.querySelectorAll(".section-label, .project-details").length'), 0);
+  const readZip = buffer => {
+    const entries = new Map();
+    for (let offset = buffer.readUInt32LE(buffer.length - 6), index = 0; index < buffer.readUInt16LE(buffer.length - 12); index++) {
+      const nameLength = buffer.readUInt16LE(offset + 28);
+      const size = buffer.readUInt32LE(offset + 20);
+      const local = buffer.readUInt32LE(offset + 42);
+      const dataStart = local + 30 + buffer.readUInt16LE(local + 26) + buffer.readUInt16LE(local + 28);
+      entries.set(buffer.subarray(offset + 46, offset + 46 + nameLength).toString('utf8'), buffer.subarray(dataStart, dataStart + size));
+      offset += 46 + nameLength + buffer.readUInt16LE(offset + 30) + buffer.readUInt16LE(offset + 32);
+    }
+    return entries;
+  };
+  const png = await readFile(new URL('../fixtures/export-image.png', import.meta.url));
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>globalThis.viewerInjected = true</script></svg>');
+  const notes = Buffer.from('# my notes');
+  writeConversation(directory, assetRaw('browser-assets'));
+  const assetHost = openDatabase(directory);
+  try {
+    assetHost.beginRun('browser-assets-run', 'incremental', scopeA);
+    for (const [fileId, bytes, mime] of [[assetIds.upload, png, 'image/png'], [assetIds.doc, svg, 'image/svg+xml'], [assetIds.lonely, notes, 'text/markdown']]) {
+      assetHost.assetChunk('browser-assets-run', `up-${fileId}`, 'browser-assets', fileId, 0, bytes.toString('base64'));
+      assetHost.assetCommit('browser-assets-run', `up-${fileId}`, 'browser-assets', fileId, createHash('sha256').update(bytes).digest('hex'), bytes.length, mime);
+    }
+    assetHost.assetOutcome('browser-assets-run', 'browser-assets', assetIds.codeJupyter, 'unavailable', 'HTTP 404');
+    assetHost.endRun('browser-assets-run', false, []);
+  } finally { assetHost.close(); }
+  await evaluate('document.querySelector(".header-controls button").click()');
+  await until('!!document.querySelector("#folder-select") && !document.querySelector(".state[role=status]")');
+  await chooseFolder('All conversations');
+  await until('document.querySelectorAll(".chat-item").length === 50');
+  await evaluate(`[...document.querySelectorAll('.chat-item')].find(button => button.textContent.includes('Assets browser-assets')).click()`);
+  await until('document.querySelectorAll(".message").length === 3');
+  await until('!!document.querySelector(".message-assets img")');
+  assert.match(await evaluate('document.querySelector(".message-assets img").src'), /^blob:/);
+  await until('document.querySelector(".message-assets img").naturalWidth > 0');
+  assert.equal(await evaluate('document.querySelectorAll(".message-assets img").length'), 1, 'SVG is never shown inline');
+  const chips = await evaluate('[...document.querySelectorAll(".asset-file button")].map(node => node.textContent)');
+  assert.equal(chips.length, 2);
+  assert.match(chips[0], /^Download file-document001\.bin \(\d+ KB\)$/);
+  assert.match(chips[1], /^Download notes\.md \(1 KB\)$/);
+  assert.equal(await evaluate('document.querySelectorAll(".asset-missing").length'), 4);
+  assert.equal(await evaluate('document.querySelector(".asset-missing").textContent.includes("not downloaded yet")'), true);
+  assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
+  await evaluate(`[...document.querySelectorAll('.asset-file button')].find(button => button.textContent.includes('notes.md')).click()`);
+  assert.deepEqual(await downloaded('notes.md'), notes);
+  await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent === 'Export Markdown').click()`);
+  const singleZip = readZip(await downloaded('Assets browser-assets (browser-).zip'));
+  assert.deepEqual([...singleZip.keys()].sort(), [
+    `assets/${assetIds.doc}.bin`, `assets/${assetIds.lonely}.md`, `assets/${assetIds.upload}.png`, 'Assets browser-assets (browser-).md',
+  ].sort());
+  assert.deepEqual(singleZip.get(`assets/${assetIds.upload}.png`), png);
+  assert.deepEqual(singleZip.get(`assets/${assetIds.doc}.bin`), svg);
+  assert.ok(singleZip.get('Assets browser-assets (browser-).md').toString('utf8').includes(`![photo.png](assets/${assetIds.upload}.png)`));
+  await chooseFolder('No project marker');
+  await until('document.querySelectorAll(".chat-item").length > 1');
+  await evaluate(`document.querySelector('.export-folder').click()`);
+  await until('/Exported (\\d+) of \\1 conversations/.test(document.querySelector(".export-message")?.textContent ?? "")');
+  const folderZip = readZip(await downloaded('No project marker.zip'));
+  const folderAssets = [...folderZip.keys()].filter(name => name.includes('/assets/'));
+  assert.deepEqual(folderAssets.sort(), [
+    `No project marker/assets/${assetIds.doc}.bin`, `No project marker/assets/${assetIds.lonely}.md`, `No project marker/assets/${assetIds.upload}.png`,
+  ].sort());
+  assert.deepEqual(folderZip.get(`No project marker/assets/${assetIds.upload}.png`), png);
+  assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
+
   await evaluate(`document.querySelector('#account').value = ${JSON.stringify(accountB)};
     document.querySelector('#account').dispatchEvent(new Event('change', { bubbles: true }));`);
   await until('[...document.querySelectorAll("#folder-select option")].some(option => option.textContent.includes("Other account project"))');
@@ -252,7 +354,7 @@ try {
   assert.equal(await evaluate('document.querySelectorAll(".message").length'), 0);
   assert.deepEqual(externalRequests, [], 'Viewer must not request remote resources');
   assert.deepEqual(exceptions, [], 'Viewer must not throw browser runtime errors');
-  console.log('Viewer browser checks passed: compact conversation rows, folder names/counts, last-sync footer, account isolation, hostile metadata, Markdown/HTML, paging, narrow layout, revision reload, and private launch.');
+  console.log('Viewer browser checks passed: compact conversation rows, folder names/counts, last-sync footer, account isolation, hostile metadata, Markdown/HTML, paging, narrow layout, revision reload, saved images/files with ZIP export, and private launch.');
 } finally {
   ws?.close();
   if (browser && browser.exitCode === null) browser.kill();

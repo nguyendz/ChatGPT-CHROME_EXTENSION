@@ -3,12 +3,20 @@ import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { parseConversationNodes, type ChatGptRawConversation } from '../../lib/chatgpt-parse.ts';
-import { HOST_VERSION } from '../../lib/sync/protocol.ts';
-import type { AccountScope, HostStatus, ProjectSyncOutcome, UpsertStatus } from '../../lib/sync/protocol.ts';
+import { extractAssetRefs, isFileId, normalizeMime } from '../../lib/asset-refs.ts';
+import {
+  ASSET_CHUNK_BYTES, HOST_VERSION, MAX_ASSET_ATTEMPTS, MAX_ASSET_BYTES, MAX_ASSET_CHUNK_CHARS,
+  MAX_ASSET_HINT_CONVERSATIONS, MAX_RUN_ASSETS,
+} from '../../lib/sync/protocol.ts';
+import type {
+  AccountScope, AssetRunSummary, AssetState, HostStatus, PendingAsset, ProjectSyncOutcome, UpsertStatus,
+} from '../../lib/sync/protocol.ts';
 import { checkProjectCatalogSize, projectItemJson, projectMetadata } from '../../lib/project-catalog.ts';
 import type { ProjectItem } from '../../lib/project-catalog.ts';
+import { writeAssetBlob } from './assets.ts';
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
+const MAX_UPLOAD_SESSIONS = 4;
 const MAX_CONVERSATION_BYTES = 60 * 1024 * 1024;
 const MAX_SYNC_DIFF_BYTES = 5 * 1024 * 1024;
 const MAX_SYNC_DIFF_PATHS = 64;
@@ -69,12 +77,56 @@ export interface HostDatabase {
     cancelled: boolean,
     failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>,
     projects?: ProjectSyncOutcome,
+    assets?: AssetRunSummary,
   ): {
     runId: string;
     status: 'completed' | 'failed' | 'cancelled';
     counts: { listed: number; new: number; updated: number; unchanged: number; failed: number };
   };
+  listPendingAssets(
+    runId: string, conversationIds: string[], includeOthers: boolean, limit: number,
+  ): PendingAsset[];
+  assetChunk(
+    runId: string, uploadId: string, conversationId: string, fileId: string, seq: number, data: string,
+  ): { received: number };
+  assetCommit(
+    runId: string, uploadId: string, conversationId: string, fileId: string,
+    sha256: string, size: number, mime: string,
+  ): { status: 'stored' | 'deduplicated' };
+  assetOutcome(
+    runId: string, conversationId: string, fileId: string,
+    state: 'too-large' | 'unavailable' | 'failed', error?: string,
+  ): { state: AssetState; attempts: number };
   close(): void;
+}
+
+function syncAssetRefs(db: DatabaseSync, accountId: string, conversationId: string, raw: unknown, now: string) {
+  const { refs } = extractAssetRefs(raw);
+  const upsert = db.prepare(`INSERT INTO asset_refs(account_id, conversation_id, file_id, kind, message_ids, name,
+      declared_mime, declared_size, library_file_id, state, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(account_id, conversation_id, file_id) DO UPDATE SET kind = excluded.kind,
+      message_ids = excluded.message_ids, name = excluded.name, declared_mime = excluded.declared_mime,
+      declared_size = excluded.declared_size, library_file_id = excluded.library_file_id,
+      updated_at = excluded.updated_at`);
+  for (const ref of refs) {
+    const state = ref.declaredSize !== null && ref.declaredSize > MAX_ASSET_BYTES ? 'too-large' : 'pending';
+    upsert.run(accountId, conversationId, ref.fileId, ref.kind, JSON.stringify(ref.messageIds), ref.name,
+      ref.declaredMime, ref.declaredSize, ref.libraryFileId, state, now);
+  }
+  const keep = new Set(refs.map(ref => ref.fileId));
+  const remove = db.prepare('DELETE FROM asset_refs WHERE account_id = ? AND conversation_id = ? AND file_id = ?');
+  for (const row of db.prepare('SELECT file_id FROM asset_refs WHERE account_id = ? AND conversation_id = ?')
+    .all(accountId, conversationId)) {
+    if (typeof row.file_id === 'string' && !keep.has(row.file_id)) remove.run(accountId, conversationId, row.file_id);
+  }
+  // A file already stored for this account under another chat needs no second download.
+  db.prepare(`UPDATE asset_refs SET state = 'stored', last_error = NULL,
+      sha256 = (SELECT o.sha256 FROM asset_refs o WHERE o.account_id = asset_refs.account_id
+        AND o.file_id = asset_refs.file_id AND o.state = 'stored' LIMIT 1)
+    WHERE account_id = ? AND conversation_id = ? AND state <> 'stored'
+      AND EXISTS (SELECT 1 FROM asset_refs o WHERE o.account_id = asset_refs.account_id
+        AND o.file_id = asset_refs.file_id AND o.state = 'stored')`).run(accountId, conversationId);
 }
 
 function accountIdFor(account: AccountScope) {
@@ -315,12 +367,72 @@ export function openDatabase(directory: string): HostDatabase {
         INSERT INTO schema_migrations(version, applied_at) VALUES (4, '${new Date().toISOString()}');
       `);
     }
+    if (typeof version !== 'number' || version < 5) {
+      db.exec(`
+        CREATE TABLE assets(
+          sha256 TEXT PRIMARY KEY CHECK(length(sha256) = 64),
+          size INTEGER NOT NULL CHECK(size > 0),
+          mime TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE asset_refs(
+          account_id TEXT NOT NULL REFERENCES accounts(id),
+          conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          file_id TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK(kind IN ('attachment', 'image-upload', 'image-generated', 'code-output')),
+          message_ids TEXT NOT NULL,
+          name TEXT,
+          declared_mime TEXT,
+          declared_size INTEGER,
+          library_file_id TEXT,
+          sha256 TEXT REFERENCES assets(sha256),
+          state TEXT NOT NULL DEFAULT 'pending'
+            CHECK(state IN ('pending', 'stored', 'too-large', 'unavailable', 'failed')),
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT,
+          last_attempt_run_id TEXT,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(account_id, conversation_id, file_id),
+          CHECK((state = 'stored') = (sha256 IS NOT NULL))
+        );
+        CREATE INDEX asset_refs_state_idx ON asset_refs(account_id, state);
+        CREATE INDEX asset_refs_file_idx ON asset_refs(account_id, file_id);
+        ALTER TABLE sync_runs ADD COLUMN assets_json TEXT;
+      `);
+      const migratedAt = new Date().toISOString();
+      for (const row of db.prepare('SELECT id, account_id, raw_json FROM conversations').all()) {
+        let raw: unknown;
+        try { raw = JSON.parse(String(row.raw_json)); } catch { continue; }
+        syncAssetRefs(db, String(row.account_id), String(row.id), raw, migratedAt);
+      }
+      db.prepare('INSERT INTO schema_migrations(version, applied_at) VALUES (5, ?)').run(migratedAt);
+    }
     db.prepare("UPDATE meta SET value = ? WHERE key = 'host_version'").run(HOST_VERSION);
     db.exec('COMMIT');
   } catch (error) {
     try { db.exec('ROLLBACK'); } catch {}
     db.close();
     throw error;
+  }
+  const uploads = new Map<string, {
+    runId: string; conversationId: string; fileId: string; chunks: Buffer[]; bytes: number; nextSeq: number;
+  }>();
+  function activeRunAccount(runId: string): string {
+    const run = db.prepare("SELECT account_id FROM sync_runs WHERE id = ? AND owner_id = ? AND status = 'running'")
+      .get(runId, ownerId);
+    if (!run || typeof run.account_id !== 'string') {
+      throw new HostOperationError('INVALID_PAYLOAD', 'Sync run is not active or owned by this host.');
+    }
+    return run.account_id;
+  }
+  function requireDownloadableRef(accountId: string, conversationId: string, fileId: string) {
+    const ref = db.prepare(`SELECT conversation_id, state FROM asset_refs
+      WHERE account_id = ? AND conversation_id = ? AND file_id = ?`).get(accountId, conversationId, fileId);
+    if (!ref) throw new HostOperationError('INVALID_PAYLOAD', 'Asset is not referenced by a saved conversation of this account.');
+    if (ref.state === 'stored' || ref.state === 'too-large') {
+      throw new HostOperationError('INVALID_PAYLOAD', 'Asset does not need to be downloaded.');
+    }
+    return { conversationId: String(ref.conversation_id) };
   }
   return {
     status(): HostStatus {
@@ -329,17 +441,25 @@ export function openDatabase(directory: string): HostDatabase {
       const counts = db.prepare(`
         SELECT
           (SELECT COUNT(*) FROM conversations) AS conversations,
-          (SELECT COUNT(*) FROM messages) AS messages
+          (SELECT COUNT(*) FROM messages) AS messages,
+          (SELECT COUNT(*) FROM assets) AS assets,
+          (SELECT COALESCE(SUM(size), 0) FROM assets) AS asset_bytes,
+          (SELECT COUNT(*) FROM asset_refs WHERE state IN ('pending', 'failed')
+            OR state = 'unavailable' AND attempts < ${MAX_ASSET_ATTEMPTS}) AS assets_pending
       `).get();
       if (!counts) throw new Error('Database counts are unavailable');
       return {
         hostVersion: HOST_VERSION, protocolRange: [1, 1],
         capabilities: [
           'ping', 'echo', 'status', 'single-chat-sync', 'all-chat-sync', 'message-change-counts', 'project-catalog',
-          'local-viewer',
+          'local-viewer', 'asset-sync',
         ], dbPath: path,
         schemaVersion: SCHEMA_VERSION, installId,
-        counts: { conversations: Number(counts.conversations), messages: Number(counts.messages) },
+        counts: {
+          conversations: Number(counts.conversations), messages: Number(counts.messages),
+          assets: Number(counts.assets), assetBytes: Number(counts.asset_bytes),
+          assetsPending: Number(counts.assets_pending),
+        },
       };
     },
     beginRun(runId: string, mode: 'single' | 'incremental', account: AccountScope, projectCatalog = false) {
@@ -611,6 +731,7 @@ export function openDatabase(directory: string): HostDatabase {
           rawJson, sha256, existing?.first_synced_at ?? now, now, now, manifestUpdateToken ?? null,
         );
         db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(conversationId);
+        syncAssetRefs(db, accountId, conversationId, raw, now);
         const insertMessage = db.prepare(`
           INSERT INTO messages(
             id, conversation_id, parent_id, role, model, content_type, text, create_time, is_on_active_branch
@@ -635,6 +756,7 @@ export function openDatabase(directory: string): HostDatabase {
       cancelled: boolean,
       failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>,
       projects?: ProjectSyncOutcome,
+      assets?: AssetRunSummary,
     ) {
       const run = db.prepare("SELECT account_id, listed, new, updated, unchanged FROM sync_runs WHERE id = ? AND owner_id = ? AND status = 'running'").get(runId, ownerId);
       if (!run) throw new HostOperationError('INVALID_PAYLOAD', 'Sync run is not active.');
@@ -665,14 +787,15 @@ export function openDatabase(directory: string): HostDatabase {
           }
         }
         db.prepare(`
-          UPDATE sync_runs SET ended_at = ?, status = ?, failed = ?, cancelled = ?
+          UPDATE sync_runs SET ended_at = ?, status = ?, failed = ?, cancelled = ?, assets_json = ?
           WHERE id = ? AND status = 'running'
-        `).run(now, status, failures.length, cancelled ? 1 : 0, runId);
+        `).run(now, status, failures.length, cancelled ? 1 : 0, assets ? JSON.stringify(assets) : null, runId);
         db.exec('COMMIT');
       } catch (error) {
         try { db.exec('ROLLBACK'); } catch {}
         throw error;
       }
+      for (const [uploadId, session] of uploads) if (session.runId === runId) uploads.delete(uploadId);
       if (failures.length > 0) {
         const categories: Record<string, number> = {};
         for (const failure of failures) {
@@ -699,7 +822,113 @@ export function openDatabase(directory: string): HostDatabase {
         },
       };
     },
+    listPendingAssets(runId, conversationIds, includeOthers, limit) {
+      const accountId = activeRunAccount(runId);
+      if (!Array.isArray(conversationIds) || conversationIds.length > MAX_ASSET_HINT_CONVERSATIONS ||
+        conversationIds.some(id => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(id)) ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > MAX_RUN_ASSETS) {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Pending-asset request has invalid conversation IDs or limit.');
+      }
+      const ids = JSON.stringify(conversationIds);
+      return db.prepare(`SELECT r.conversation_id, r.file_id, r.kind, r.declared_size, r.declared_mime, r.library_file_id
+        FROM asset_refs r JOIN conversations c ON c.id = r.conversation_id
+        WHERE r.account_id = ?
+          AND (r.state IN ('pending', 'failed') OR r.state = 'unavailable' AND r.attempts < ${MAX_ASSET_ATTEMPTS})
+          AND COALESCE(r.last_attempt_run_id, '') <> ?
+          AND (? = 1 OR r.conversation_id IN (SELECT value FROM json_each(?)))
+        ORDER BY (r.conversation_id IN (SELECT value FROM json_each(?))) DESC, r.attempts ASC,
+          c.update_time DESC NULLS LAST, r.conversation_id, r.file_id
+        LIMIT ?`).all(accountId, runId, includeOthers ? 1 : 0, ids, ids, limit).map(row => ({
+        conversationId: String(row.conversation_id), fileId: String(row.file_id), kind: row.kind as PendingAsset['kind'],
+        declaredSize: typeof row.declared_size === 'number' ? row.declared_size : null,
+        declaredMime: typeof row.declared_mime === 'string' ? row.declared_mime : null,
+        libraryFileId: typeof row.library_file_id === 'string' ? row.library_file_id : null,
+      }));
+    },
+    assetChunk(runId, uploadId, conversationId, fileId, seq, data) {
+      const accountId = activeRunAccount(runId);
+      if (!/^[a-zA-Z0-9-]{1,128}$/.test(uploadId) || !isFileId(fileId) || !Number.isSafeInteger(seq) || seq < 0 ||
+        typeof data !== 'string' || data.length === 0 || data.length > MAX_ASSET_CHUNK_CHARS ||
+        data.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Asset chunk is malformed.');
+      }
+      const ref = requireDownloadableRef(accountId, conversationId, fileId);
+      const chunk = Buffer.from(data, 'base64');
+      if (chunk.length === 0 || chunk.length > ASSET_CHUNK_BYTES) {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Asset chunk exceeds the chunk limit.');
+      }
+      let session = uploads.get(uploadId);
+      if (seq === 0) {
+        if (session) throw new HostOperationError('INVALID_PAYLOAD', 'Asset upload was already started.');
+        if (uploads.size >= MAX_UPLOAD_SESSIONS) throw new HostOperationError('BUSY', 'Too many asset uploads are in progress.');
+        session = { runId, conversationId: ref.conversationId, fileId, chunks: [], bytes: 0, nextSeq: 0 };
+        uploads.set(uploadId, session);
+      }
+      if (!session || session.runId !== runId || session.conversationId !== conversationId ||
+        session.fileId !== fileId || session.nextSeq !== seq) {
+        uploads.delete(uploadId);
+        throw new HostOperationError('INVALID_PAYLOAD', 'Asset chunk is out of order or belongs to another upload.');
+      }
+      if (session.bytes + chunk.length > MAX_ASSET_BYTES) {
+        uploads.delete(uploadId);
+        throw new HostOperationError('TOO_LARGE', 'Asset exceeds the 5 MB limit.');
+      }
+      session.chunks.push(chunk);
+      session.bytes += chunk.length;
+      session.nextSeq++;
+      return { received: session.bytes };
+    },
+    assetCommit(runId, uploadId, conversationId, fileId, sha256, size, mime) {
+      const accountId = activeRunAccount(runId);
+      const session = uploads.get(uploadId);
+      uploads.delete(uploadId);
+      if (!session || session.runId !== runId || session.conversationId !== conversationId || session.fileId !== fileId ||
+        !/^[a-f0-9]{64}$/.test(sha256) || !Number.isSafeInteger(size) || size !== session.bytes) {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Asset commit does not match the received upload.');
+      }
+      requireDownloadableRef(accountId, conversationId, fileId);
+      const bytes = Buffer.concat(session.chunks);
+      if (createHash('sha256').update(bytes).digest('hex') !== sha256) {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Asset SHA-256 did not match the received bytes.');
+      }
+      const known = db.prepare('SELECT 1 FROM assets WHERE sha256 = ?').get(sha256);
+      const written = writeAssetBlob(directory, sha256, bytes);
+      const now = new Date().toISOString();
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.prepare('INSERT OR IGNORE INTO assets(sha256, size, mime, created_at) VALUES (?, ?, ?, ?)')
+          .run(sha256, bytes.length, normalizeMime(mime) ?? 'application/octet-stream', now);
+        db.prepare(`UPDATE asset_refs SET state = 'stored', sha256 = ?, last_error = NULL,
+            last_attempt_run_id = ?, updated_at = ?
+          WHERE account_id = ? AND conversation_id = ? AND file_id = ?`).run(sha256, runId, now, accountId, conversationId, fileId);
+        db.prepare(`UPDATE asset_refs SET state = 'stored', sha256 = ?, last_error = NULL, updated_at = ?
+          WHERE account_id = ? AND file_id = ? AND state <> 'stored'`).run(sha256, now, accountId, fileId);
+        db.exec('COMMIT');
+      } catch (error) {
+        try { db.exec('ROLLBACK'); } catch {}
+        throw error;
+      }
+      return { status: known && written === 'deduplicated' ? 'deduplicated' : 'stored' };
+    },
+    assetOutcome(runId, conversationId, fileId, state, error) {
+      const accountId = activeRunAccount(runId);
+      if (state !== 'too-large' && state !== 'unavailable' && state !== 'failed') {
+        throw new HostOperationError('INVALID_PAYLOAD', 'Unsupported asset outcome state.');
+      }
+      requireDownloadableRef(accountId, conversationId, fileId);
+      for (const [uploadId, session] of uploads) {
+        if (session.runId === runId && session.conversationId === conversationId && session.fileId === fileId) uploads.delete(uploadId);
+      }
+      db.prepare(`UPDATE asset_refs SET state = ?, attempts = attempts + 1, last_error = ?,
+          last_attempt_run_id = ?, updated_at = ?
+        WHERE account_id = ? AND conversation_id = ? AND file_id = ?`)
+        .run(state, error ? error.slice(0, 200) : null, runId, new Date().toISOString(), accountId, conversationId, fileId);
+      const row = db.prepare('SELECT state, attempts FROM asset_refs WHERE account_id = ? AND conversation_id = ? AND file_id = ?')
+        .get(accountId, conversationId, fileId);
+      return { state: row?.state as AssetState, attempts: Number(row?.attempts) };
+    },
     close() {
+      uploads.clear();
       try {
         const activeRuns = db.prepare("SELECT id FROM sync_runs WHERE owner_id = ? AND status = 'running'").all(ownerId);
         if (activeRuns.length) {

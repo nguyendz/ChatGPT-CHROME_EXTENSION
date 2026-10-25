@@ -1,8 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { SQLOutputValue } from 'node:sqlite';
+import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { isRecord } from '../../lib/sync/protocol.ts';
-import type { Account, ArchiveStatus, ConversationDetail, ConversationGroup, ConversationSummary, Page, ViewerMessage } from './types.ts';
+import { assetBlobPath } from '../host/assets.ts';
+import { assetFileName, conversationMarkdown, markdownFileName } from './markdown.ts';
+import type { Account, ArchiveStatus, AssetState, ConversationDetail, ConversationGroup, ConversationSummary, ExportAsset, MarkdownExport, Page, ViewerAsset, ViewerMessage } from './types.ts';
 
 type Row = Record<string, SQLOutputValue>;
 const MAX_RAW_BYTES = 60 * 1024 * 1024;
@@ -96,14 +99,16 @@ function encodeCursor(value: unknown): string {
 export class Archive {
   private db: DatabaseSync;
   private schemaVersion: number;
+  private directory: string;
 
   constructor(directory: string) {
+    this.directory = directory;
     this.db = new DatabaseSync(join(directory, 'sync.db'), { readOnly: true });
     try {
       this.db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=2000;');
       const version = this.db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()?.version;
-      if (version !== 3 && version !== 4) {
-        throw new ViewerError(409, 'INCOMPATIBLE_SCHEMA', 'This viewer requires archive schema 3 or 4. Update the host/viewer together.');
+      if (version !== 3 && version !== 4 && version !== 5) {
+        throw new ViewerError(409, 'INCOMPATIBLE_SCHEMA', 'This viewer requires archive schema 3, 4, or 5. Update the host/viewer together.');
       }
       this.schemaVersion = version;
       const required: Record<string, string[]> = {
@@ -112,9 +117,13 @@ export class Archive {
         messages: ['id', 'conversation_id', 'role', 'model', 'content_type', 'text', 'create_time'],
         sync_runs: ['ended_at'],
       };
-      if (version === 4) {
+      if (version >= 4) {
         required.projects = ['account_id', 'id', 'name', 'description', 'is_archived', 'remote_updated_at', 'last_synced_at', 'last_seen_run_id'];
         required.project_catalog_state = ['account_id', 'last_successful_run_id', 'status', 'error_category'];
+      }
+      if (version >= 5) {
+        required.assets = ['sha256', 'size', 'mime'];
+        required.asset_refs = ['account_id', 'conversation_id', 'file_id', 'kind', 'message_ids', 'name', 'declared_mime', 'declared_size', 'sha256', 'state'];
       }
       for (const [table, columns] of Object.entries(required)) {
         const existing = this.db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name);
@@ -317,6 +326,86 @@ export class Archive {
     return this.snapshot(() => this.readConversation(accountId, id).detail);
   }
 
+  /** Asset references of one conversation grouped by message. Stored files that vanished from disk read as unavailable. */
+  private assetsByMessage(accountId: string, id: string): Map<string, ViewerAsset[]> {
+    const result = new Map<string, ViewerAsset[]>();
+    if (this.schemaVersion < 5) return result;
+    const rows = this.db.prepare(`SELECT r.file_id, r.kind, r.name, r.declared_mime, r.declared_size, r.state,
+        r.message_ids, r.sha256, a.mime AS stored_mime, a.size AS stored_size
+      FROM asset_refs r LEFT JOIN assets a ON a.sha256 = r.sha256
+      WHERE r.account_id = ? AND r.conversation_id = ? ORDER BY r.rowid`).all(accountId, id);
+    for (const row of rows) {
+      let state = text(row, 'state') as AssetState;
+      const stored = state === 'stored';
+      if (stored && !existsSync(assetBlobPath(this.directory, text(row, 'sha256')))) state = 'unavailable';
+      const asset: ViewerAsset = {
+        fileId: text(row, 'file_id'), kind: text(row, 'kind') as ViewerAsset['kind'], name: nullableText(row, 'name'),
+        mime: stored ? nullableText(row, 'stored_mime') : nullableText(row, 'declared_mime'),
+        size: stored ? number(row, 'stored_size') : row.declared_size === null ? null : number(row, 'declared_size'),
+        state,
+      };
+      let messageIds: unknown;
+      try { messageIds = JSON.parse(text(row, 'message_ids')); } catch { return corrupt(); }
+      if (!Array.isArray(messageIds) || messageIds.some(item => typeof item !== 'string')) return corrupt();
+      for (const messageId of messageIds as string[]) result.set(messageId, [...(result.get(messageId) ?? []), asset]);
+    }
+    return result;
+  }
+
+  private readMessages(accountId: string, id: string, nodes: Array<{ id: string; unsupported: boolean }>): ViewerMessage[] {
+    const query = this.db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND id = ?');
+    const assets = this.assetsByMessage(accountId, id);
+    return nodes.map(node => {
+      const row = query.get(id, node.id);
+      if (!row) return corrupt();
+      return {
+        id: node.id, role: text(row, 'role'), model: nullableText(row, 'model'),
+        contentType: nullableText(row, 'content_type'), text: text(row, 'text'),
+        createTime: row.create_time === null ? null : number(row, 'create_time'),
+        unsupportedContent: node.unsupported, assets: assets.get(node.id) ?? [],
+      };
+    });
+  }
+
+  /** Full saved active branch as one Markdown document, read from a single consistent snapshot. */
+  exportMarkdown(accountId: string, id: string): MarkdownExport {
+    return this.snapshot(() => {
+      this.checkAccount(accountId);
+      const { detail, path } = this.readConversation(accountId, id);
+      const messages = this.readMessages(accountId, id, path);
+      const files = new Map<string, ExportAsset>();
+      for (const asset of messages.flatMap(message => message.assets)) {
+        if (asset.state === 'stored' && asset.size !== null && !files.has(asset.fileId)) {
+          files.set(asset.fileId, { fileId: asset.fileId, fileName: assetFileName(asset.fileId, asset.mime), mime: asset.mime, size: asset.size });
+        }
+      }
+      return {
+        id, fileName: markdownFileName(detail.title, id),
+        markdown: conversationMarkdown(detail, messages, files), assets: [...files.values()],
+      };
+    });
+  }
+
+  /** Location and metadata of one stored file, only for the given account and conversation. */
+  assetFile(accountId: string, conversationId: string, fileId: string):
+    { path: string; mime: string | null; size: number; name: string | null } {
+    if (this.schemaVersion < 5) throw new ViewerError(404, 'NOT_FOUND', 'Saved file not found.');
+    return this.snapshot(() => {
+      this.checkAccount(accountId);
+      const row = this.db.prepare(`SELECT r.name, a.sha256, a.mime, a.size FROM asset_refs r
+        JOIN assets a ON a.sha256 = r.sha256
+        WHERE r.account_id = ? AND r.conversation_id = ? AND r.file_id = ? AND r.state = 'stored'`)
+        .get(accountId, conversationId, fileId);
+      if (!row) throw new ViewerError(404, 'NOT_FOUND', 'Saved file not found for this conversation.');
+      const path = assetBlobPath(this.directory, text(row, 'sha256'));
+      const size = number(row, 'size');
+      if (!existsSync(path) || statSync(path).size !== size) {
+        throw new ViewerError(404, 'NOT_FOUND', 'The saved file is missing from the local archive folder.');
+      }
+      return { path, mime: nullableText(row, 'mime'), size, name: nullableText(row, 'name') };
+    });
+  }
+
   messages(accountId: string, id: string, revision: string, limit: number, cursor: string | null): Page<ViewerMessage> {
     return this.snapshot(() => {
       const { detail, path } = this.readConversation(accountId, id);
@@ -333,18 +422,7 @@ export class Archive {
         }
         offset = value.offset;
       }
-      const selected = path.slice(offset, offset + limit);
-      const query = this.db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND id = ?');
-      const items = selected.map(node => {
-        const row = query.get(id, node.id);
-        if (!row) return corrupt();
-        return {
-          id: node.id, role: text(row, 'role'), model: nullableText(row, 'model'),
-          contentType: nullableText(row, 'content_type'), text: text(row, 'text'),
-          createTime: row.create_time === null ? null : number(row, 'create_time'),
-          unsupportedContent: node.unsupported,
-        };
-      });
+      const items = this.readMessages(accountId, id, path.slice(offset, offset + limit));
       const next = offset + items.length;
       return {
         items,

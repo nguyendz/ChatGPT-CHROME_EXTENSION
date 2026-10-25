@@ -210,16 +210,22 @@ test('schema 3 upgrade preserves existing archive data; viewer remains compatibl
   raw.gizmo_id = 'g-p-fixture-a';
   db.upsertConversation('old-run', raw.conversation_id, raw, projectItem(raw).sha256, 'n:100');
   db.endRun('old-run', false, []);
-  reader.exec('DROP TABLE projects; DROP TABLE project_catalog_state; DELETE FROM schema_migrations WHERE version = 4;');
-  const before = JSON.stringify(['accounts', 'sync_runs', 'conversations', 'messages'].map(table => reader.prepare(`SELECT * FROM ${table}`).all()));
+  reader.exec(`DROP TABLE projects; DROP TABLE project_catalog_state; DROP TABLE asset_refs; DROP TABLE assets;
+    ALTER TABLE sync_runs DROP COLUMN assets_json; DELETE FROM schema_migrations WHERE version IN (4, 5);`);
+  const tables = {
+    accounts: '*', conversations: '*', messages: '*',
+    sync_runs: 'id, account_id, owner_id, mode, started_at, ended_at, status, listed, new, updated, unchanged, failed, cancelled',
+  };
+  const snapshot = () => JSON.stringify(Object.entries(tables).map(([table, columns]) => reader.prepare(`SELECT ${columns} FROM ${table}`).all()));
+  const before = snapshot();
   const old = new Archive(directory);
   assert.equal(old.status().schemaVersion, 3);
   assert.equal(old.groups(accountId).find(group => group.kind === 'project').label, 'Unnamed project 1');
   old.close();
   const migrated = openDatabase(directory);
   try {
-    assert.equal(migrated.status().schemaVersion, 4);
-    assert.equal(JSON.stringify(['accounts', 'sync_runs', 'conversations', 'messages'].map(table => reader.prepare(`SELECT * FROM ${table}`).all())), before);
+    assert.equal(migrated.status().schemaVersion, 5);
+    assert.equal(snapshot(), before);
   } finally { migrated.close(); }
 });
 

@@ -24,7 +24,7 @@ Companion to [local-sync-feature.md](./local-sync-feature.md) (rev 2). The desig
 flowchart LR
   W1[Wave 1 · Milestone 1<br/>Local app + communication] --> W2[Wave 2<br/>API spike + single-chat sync]
   W2 --> W3[Wave 3<br/>Incremental all-chats sync = MVP]
-  W3 --> W4[Wave 4<br/>Project metadata + completeness:<br/>reconcile, archived, auto/live sync]
+  W3 --> W4[Wave 4<br/>Project metadata + completeness:<br/>project coverage, reconcile, accounts]
   W3 --> W5[Wave 5<br/>Images & attachments]
   W3 --> W6[Wave 6<br/>Local viewer app]
   W6 -. Existing 6A reader used by 4A .-> W4
@@ -35,8 +35,8 @@ flowchart LR
 | **1** | Extension ↔ local host round-trip works. The DB file is created. The popup shows a live host status. | ~2–3 days |
 | **2 — in progress** | Single-chat sync and the sanitized Wave 2.1 API probe are implemented and automated checks pass. Regular-chat and one project-chat probes were reviewed; the tested project chat appeared in the sampled default list, but full coverage, ordering-parameter support, and archive behavior remain unconfirmed. Insert/no-op/update confirmation remains. See the [Wave 2.1 probe plan](./local-sync-wave-2.1-probe-plan.md) and [detailed Wave 2 plan](./local-sync-wave-2-plan.md). | ~2–3 days |
 | 3 | **Sync MVP**: incremental sync with full-list enumeration, manifest no-ops, progress, and Stop; early-stop remains gated on ordering evidence. | ~3–4 days |
-| **4 — in progress** | **4A implemented:** project metadata/viewer labels; live acceptance pending. **4B/4C planned:** verified coverage/reconciliation, account handling and scheduled/live sync. See the [Wave 4 plan](./local-sync-wave-4-plan.md). | Re-estimate remaining work after API/account-scope confirmation |
-| 5 | Images and attachments in a content-addressed store. | ~2 days |
+| **4 — in progress** | **4A implemented:** project metadata/viewer labels; live acceptance pending. **4B/4C planned:** verified project coverage/reconciliation and account handling; archived coverage and scheduled/live sync descoped. See the [Wave 4 plan](./local-sync-wave-4-plan.md). | Re-estimate remaining work after API/account-scope confirmation |
+| **5 — implemented; signed-in acceptance pending** | Images and files in a content-addressed store, shown in the viewer and included in Markdown export; opt-in per run with size caps. See the [Wave 5 plan](./local-sync-wave-5-plan.md). | ~4–5 days |
 | 6 | Local viewer, staged: **6A browse/read**, then **6B branches/search (FTS5)**, then **6C MD/JSON export**. See the [Wave 6 plan](./local-sync-wave-6-plan.md). | Estimate after 6A implementation |
 
 ---
@@ -343,15 +343,19 @@ gated early-stop paging optimization.
 ## Wave 4 — Project metadata and sync completeness
 
 The [detailed Wave 4 plan](./local-sync-wave-4-plan.md) starts with **4A project
-metadata**, followed by **4B coverage/reconciliation** and **4C automation/account
-handling**. The existing completeness tasks remain in this wave.
+metadata**, followed by **4B coverage/reconciliation** and **4C account
+handling**. Archived-chat coverage (W4.2) and scheduled/live sync (W4.4, W4.5)
+were descoped on 2026-10-25: archived chats are not a current use case, and
+unattended API traffic risks vendor blocking, so every sync stays user-started.
 The detailed plan owns implementation/acceptance specifics; this section
 summarizes the same task IDs, dependencies, and gates.
 
 The supplied sidebar response establishes actual project names and metadata:
 7 project records, with 31 nested conversation previews. The root cursor is
-null, but 5 projects have non-null conversation cursors. Metadata sync and
-complete project-chat enumeration are therefore different scopes.
+null, but 5 projects have non-null conversation cursors. Archive evidence
+shows the default conversation list already includes project chats (all 31
+previews and all 85 saved project chats appeared in it), so W4.3 is re-scoped
+to confirming that rather than building a nested-cursor enumerator.
 
 Phase 4A implements an account-scoped schema 4 catalog, bounded root enumeration, a metadata phase
 for Latest-10/All-chats runs, explicit partial failure reporting, and read-only
@@ -361,7 +365,7 @@ Root cursor continuation and endpoint workspace selection still need evidence.
 
 This wave is **in progress**: 4A implementation/automated checks are complete;
 signed-in acceptance is pending. The user confirmed 4A delivery first.
-4B/4C remain planned and disabled. It depends on the existing Wave 3
+4B/4C remain planned. It depends on the existing Wave 3
 sync; only 4A's viewer integration requires the existing Wave 6A reader.
 It does not close their outstanding live acceptance gates.
 
@@ -374,48 +378,60 @@ separately from failed-chat counts. The viewer reads schemas 3/4 offline.
 | Phase | Tasks | Delivery gate |
 |---|---|---|
 | 4A | W4.0 (P1–P6) | Saved account-scoped project names/information appear offline in the existing viewer. |
-| 4B | W4.2, W4.3, then W4.1 | Verified default/archived/project coverage supports safe manual full reconciliation. |
-| 4C | W4.6, W4.4, W4.5 | Explicit account selection and non-overlapping scheduled/live sync; weekly full runs require the 4B gate. |
+| 4B | W4.3, then W4.1 (W4.2 descoped) | Verified default/project coverage supports safe manual full reconciliation. |
+| 4C | W4.6 (W4.4, W4.5 descoped) | Explicit account selection; all sync remains user-started. |
 
 | ID / phase | Task | Depends |
 |---|---|---|
 | W4.0 / 4A | Sync sidebar project names/basic information and freshness; persist an account-scoped catalog and show real viewer folder labels. Detailed subtasks W4.0-P1–P6 are in the Wave 4 plan. | Existing W3 sync and Wave 6A viewer |
-| W4.2 / 4B | Verify archived-list parameters and terminal paging behavior, then sync archived chats without confusing them with missing chats. | Existing W3; live archive API evidence |
-| W4.3 / 4B | Verify full project-chat enumeration/nested paging; deduplicate default/archived overlaps and fetch full details. W4.0 supplies metadata, not complete membership. | W4.0; live project paging/account evidence |
-| W4.1 / 4B | Manual full reconciliation: `markMissing`, `remote_state`, and optional local removal defaulting off. No marking after partial/failed/cancelled or Latest-10 runs. | W4.2 and W4.3 coverage gates |
+| W4.2 / 4B | **Descoped.** Archived-chat coverage. | — |
+| W4.3 / 4B | Confirm the default list covers project chats (manual per-project count check) and add a sidebar-preview regression guard to All-chats runs. Build a nested-cursor enumerator only if the check fails. | W4.0; manual count check |
+| W4.1 / 4B | Manual full reconciliation: `markMissing`, `remote_state`, and optional local removal defaulting off. No marking after partial/failed/cancelled or Latest-10 runs. "Missing" covers deleted or archived chats. | W4.3 coverage gate |
 | W4.6 / 4C | Account-mismatch handling and a profile chooser in the popup. Preserve optional Edge registration (`-Browser Both`). | Existing W3 account identity and locks |
-| W4.4 / 4C | Opt-in auto-sync with `chrome.alarms`, an available session, and no active writer. Connect weekly full runs only after reconciliation safety is proven. | Existing W3; W4.6 account selection; W4.1 only for the weekly full-run hook |
-| W4.5 / 4C | Opt-in debounced finished-reply/navigation triggers through the existing single-chat path, sharing manual/scheduled writer locks. | Existing W2.5; W4.6 account selection |
+| W4.4 / 4C | **Descoped.** Scheduled sync. | — |
+| W4.5 / 4C | **Descoped.** Live sync. | — |
 
 Task numbering is stable, not execution order. W4.6 can start alongside 4A;
 4A/4B retain existing identity checks and do not depend on the new chooser.
-W4.2 and W4.3 can be verified independently. Manual reconciliation (W4.1)
-does not require the scheduler; incremental scheduling/live sync can proceed
-after W4.6 without waiting for 4B. The weekly full-run hook needs both W4.1
-and W4.4, avoiding a circular prerequisite.
 
-**Shared safety rules:** future full coverage combines verified default/archived/
-project ID sources before deduplication and selection. Latest-10 validation
+**Shared safety rules:** full coverage uses the verified default list (plus a
+project source only if W4.3 shows one is needed) before deduplication and
+selection. Latest-10 validation
 instead remains one first-page sample of ten, with no full-history scan.
 Only an explicit full run with complete required source coverage may reconcile
 absence. Sidebar absence never proves project deletion; preserve older catalog
 metadata. Missing chats are retained by default and absence is not proof of
 deletion. Every new API request reuses pacing, retries, private debug capture,
 cancellation, and account locks. Unconfirmed parameters/cursors must fail
-explicitly rather than produce incomplete success.
+explicitly rather than produce incomplete success. No sync runs without an
+explicit user action.
 
 **Wave 4 exit:** all three phase gates pass, including signed-in coverage/account
-evidence, safe reconciliation tests, offline metadata viewing, and isolated
-automation/concurrency checks. Run the affected local-sync/viewer suites,
+evidence, safe reconciliation tests, offline metadata viewing, and manual-run
+concurrency checks. Run the affected local-sync/viewer suites,
 type-check, builds, and Chrome/native-host checks listed in the detailed plan.
 Metadata delivery or synthetic tests alone do not complete Wave 4.
 
 ## Wave 5 — Assets
-| ID | Task | Depends |
+
+The [detailed Wave 5 plan](./local-sync-wave-5-plan.md) is implemented and
+automatically verified (W5.0–W5.5); signed-in acceptance (W5.6) is pending.
+Scope (2026-10-25): uploaded, generated, code-output, and library
+file references; an opt-in **Include images & files** checkbox on
+user-started runs that also backfills earlier chats; 5 MB per asset, 10 MB
+and 50 assets per run; viewer display and Markdown export with assets. The
+host derives references from the stored raw JSON, so no chats need to be
+re-fetched.
+
+| ID / phase | Task | Depends |
 |---|---|---|
-| W5.1 | Protocol: `hasAssets`, `assetChunk` (≤ 4 MB base64), and `assetCommit` (sha256 check). | W3 |
-| W5.2 | Host content-addressed store `assets/<aa>/<sha256>` plus a `conversation_assets` table. | W5.1 |
-| W5.3 | Engine: collect references with `findAssetReferences`/`findAttachmentReferences`, download with `downloadFileBlob`, and apply per-asset and per-run size limits. Options toggles. | W5.1 |
+| W5.0 / 5A | **Done.** Shared reference extractor (`lib/asset-refs.ts`) with synthetic fixtures for every kind and exclusion. | — |
+| W5.1 / 5A | **Done.** Protocol: `listPendingAssets`, `assetChunk` (≤ 4 MB base64), `assetCommit` (sha256 check), `assetOutcome`, `endRun.assets`; `asset-sync` capability. | W5.0 |
+| W5.2 / 5A | **Done.** Schema 5: content-addressed store `assets/<aa>/<sha256>`, `assets` and `asset_refs` tables, reference backfill on migration and upsert. | W5.0, W5.1 |
+| W5.3 / 5A | **Done.** Engine: assets phase, two-step `files/download`, caps, same-origin token rule, retries, debug redaction, popup checkbox. | W5.1, W5.2 |
+| W5.4 / 5B | **Done.** Viewer: scoped asset route, inline images via `blob:`, file chips, missing-asset states. | W5.2 |
+| W5.5 / 5B | **Done.** Markdown export with an `assets/` folder (ZIP for a single chat). | W5.4 |
+| W5.6 | **Pending.** Signed-in endpoint evidence per asset kind and acceptance. | W5.3 |
 
 ## Wave 6 — Local viewer app
 
@@ -455,7 +471,7 @@ unchanged. See the detailed plan for fixtures, validation, and later milestones.
 | Stdout pollution corrupts the channel | Host appears dead | Log redirect, stdout-cleanliness test, launcher with warnings off | 1 |
 | Chrome cannot find `node` | "Host exited" right away | Absolute node path written into `run-host.cmd` at registration | 1 |
 | ChatGPT's unofficial API changes | Sync breaks | One adapter module. Raw JSON is always stored. Spike in W2.1. | 2+ |
-| Early stop misses changes | Silent gaps | Keep early-stop disabled without ordering evidence; full reconciliation requires verified default/archived/project coverage. | 3–4 |
+| Early stop misses changes | Silent gaps | Keep early-stop disabled without ordering evidence; full reconciliation requires verified default-list coverage (including project chats). | 3–4 |
 | Sidebar previews or incomplete source lists are treated as full coverage | False missing/deletion decisions | Separate catalog completion from chat coverage; gate `markMissing` on a successful explicit full run across all required sources. | 4 |
 | Rate limiting on large accounts | Slow runs | All ChatGPT requests are serialized with a two-second quiet interval and existing retry backoff. A later run rescans from offset zero; committed chats are retained. | 3 |
 | `node:sqlite` API changes in a future Node | Host breaks after a Node upgrade | Register with the known node path; keep DB access in `db.ts` so `better-sqlite3` can replace it | 1+ |

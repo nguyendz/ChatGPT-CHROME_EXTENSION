@@ -100,8 +100,9 @@ try {
   const status = await evaluate("chrome.runtime.sendMessage({message:'syncHostStatus'})");
   assert.equal(status.state, 'connected', JSON.stringify(status));
   assert.equal(await evaluate('chrome.runtime.getManifest().permissions.includes("downloads")'), false);
-  assert.equal(status.host.schemaVersion, 4);
-  assert.equal(status.host.hostVersion, '0.6.0');
+  assert.equal(status.host.schemaVersion, 5);
+  assert.equal(status.host.hostVersion, '0.7.0');
+  assert.equal(status.host.capabilities.includes('asset-sync'), true);
   assert.equal(status.host.capabilities.includes('message-change-counts'), true);
   assert.equal(status.host.capabilities.includes('project-catalog'), true);
   assert.equal(status.host.capabilities.includes('local-viewer'), true);
@@ -125,7 +126,7 @@ try {
   globalThis.syncProgressPort = globalThis.makeSyncProgressPort();
   chrome.runtime.connect = () => globalThis.syncProgressPort;
   [...document.querySelectorAll('button')].find(b => b.textContent === 'Sync latest 10 chats').click()`);
-  assert.deepEqual(await evaluate('globalThis.syncProgressPort.sent'), [{ type: 'start', scope: 'latest-10' }]);
+  assert.deepEqual(await evaluate('globalThis.syncProgressPort.sent'), [{ type: 'start', scope: 'latest-10', includeAssets: false }]);
   await until('!![...document.querySelectorAll("button")].find(b => b.textContent === "Stop sync")');
   await evaluate(`globalThis.syncProgressPort.emit({type:'progress',progress:{
     phase:'projects',listed:0,total:null,selected:null,processed:0,new:0,newMessages:0,updated:0,unchanged:0,failed:0
@@ -154,6 +155,26 @@ try {
   }})`);
   await until('document.body.innerText.includes("Project information: failed (pagination-unverified)")');
   assert.equal(await evaluate('document.body.innerText.includes("All-chat sync finished with failures")'), true);
+  assert.equal(await evaluate('document.body.innerText.includes("Files:")'), false, 'No file summary when files were not requested');
+  await evaluate(`document.querySelector('input[type=checkbox]').click()`);
+  assert.equal(await evaluate('localStorage.getItem("localSync.includeAssets")'), '1');
+  await evaluate(`globalThis.syncProgressPort = globalThis.makeSyncProgressPort();
+    [...document.querySelectorAll('button')].find(b => b.textContent === 'Sync latest 10 chats').click()`);
+  assert.deepEqual(await evaluate('globalThis.syncProgressPort.sent'), [{ type: 'start', scope: 'latest-10', includeAssets: true }]);
+  await until('!![...document.querySelectorAll("button")].find(b => b.textContent === "Stop sync")');
+  await evaluate(`globalThis.syncProgressPort.emit({type:'progress',progress:{
+    phase:'assets',listed:1,total:1,selected:1,processed:1,new:0,newMessages:0,updated:0,unchanged:1,failed:0,
+    assets:{total:5,processed:2,bytes:1572864}
+  }})`);
+  await until('document.body.innerText.includes("Downloading images and files (2/5 · 1.5 MB)")');
+  await evaluate(`globalThis.syncProgressPort.emit({type:'complete',result:{
+    runId:'files-run',status:'completed',projects:{status:'completed',count:1},
+    assets:{stored:3,deduplicated:1,skippedTooLarge:1,unavailable:0,failed:0,deferred:2,bytes:2097152,stopped:'rate-limited'},
+    counts:{listed:1,selected:1,new:0,newMessages:0,updated:0,unchanged:1,failed:0}
+  }})`);
+  await until('document.body.innerText.includes("Files: 4 saved (2.0 MB), 1 over the 5 MB limit, 2 waiting for the next run. Stopped early: ChatGPT rate-limited file downloads.")');
+  await evaluate(`document.querySelector('input[type=checkbox]').click()`);
+  assert.equal(await evaluate('localStorage.getItem("localSync.includeAssets")'), '0');
   await evaluate(`chrome.runtime.sendMessage = () => new Promise(resolve => { globalThis.finishApiProbe = resolve; });
     [...document.querySelectorAll('button')].find(b => b.textContent === 'Probe ChatGPT API').click()`);
   await until('document.body.innerText.includes("Probing ChatGPT API...")');

@@ -18,11 +18,18 @@ export type ConversationSummary = {
 export type ConversationDetail = ConversationSummary & {
   revision: string; activeMessageCount: number; otherMessageCount: number; warnings: string[];
 };
+export type AssetState = 'pending' | 'stored' | 'too-large' | 'unavailable' | 'failed';
+export type ViewerAsset = {
+  fileId: string; kind: 'attachment' | 'image-upload' | 'image-generated' | 'code-output';
+  name: string | null; mime: string | null; size: number | null; state: AssetState;
+};
 export type ViewerMessage = {
   id: string; role: string; model: string | null; contentType: string | null;
-  text: string; createTime: number | null; unsupportedContent: boolean;
+  text: string; createTime: number | null; unsupportedContent: boolean; assets: ViewerAsset[];
 };
 export type Page<T> = { items: T[]; nextCursor: string | null };
+export type ExportAsset = { fileId: string; fileName: string; mime: string | null; size: number };
+export type MarkdownExport = { id: string; fileName: string; markdown: string; assets: ExportAsset[] };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,10 +73,25 @@ export function isDetail(value: unknown): value is ConversationDetail {
     count(details.activeMessageCount) && count(details.otherMessageCount) &&
     Array.isArray(details.warnings) && details.warnings.every(item => typeof item === 'string');
 }
+const ASSET_STATES = ['pending', 'stored', 'too-large', 'unavailable', 'failed'];
+const ASSET_KINDS = ['attachment', 'image-upload', 'image-generated', 'code-output'];
+function isViewerAsset(value: unknown): value is ViewerAsset {
+  return record(value) && typeof value.fileId === 'string' && /^file[-_][A-Za-z0-9]+$/.test(value.fileId) &&
+    ASSET_KINDS.includes(value.kind as string) && nullableText(value.name) && nullableText(value.mime) &&
+    (value.size === null || count(value.size)) && ASSET_STATES.includes(value.state as string);
+}
 export function isMessage(value: unknown): value is ViewerMessage {
   return record(value) && typeof value.id === 'string' && typeof value.role === 'string' &&
     nullableText(value.model) && nullableText(value.contentType) && typeof value.text === 'string' &&
-    nullableTime(value.createTime) && typeof value.unsupportedContent === 'boolean';
+    nullableTime(value.createTime) && typeof value.unsupportedContent === 'boolean' &&
+    Array.isArray(value.assets) && value.assets.every(isViewerAsset);
+}
+export function isMarkdownExport(value: unknown): value is MarkdownExport {
+  return record(value) && typeof value.id === 'string' && typeof value.fileName === 'string' &&
+    /^[^<>:"/\\|?*\u0000-\u001f]{1,200}\.md$/.test(value.fileName) && typeof value.markdown === 'string' &&
+    Array.isArray(value.assets) && value.assets.every(item => record(item) && typeof item.fileId === 'string' &&
+      /^file[-_][A-Za-z0-9]+$/.test(item.fileId) && typeof item.fileName === 'string' &&
+      /^file[-_][A-Za-z0-9]+\.[a-z0-9]{1,8}$/.test(item.fileName) && nullableText(item.mime) && count(item.size));
 }
 export function isPage<T>(value: unknown, item: (value: unknown) => value is T): value is Page<T> {
   return record(value) && Array.isArray(value.items) && value.items.every(item) && nullableText(value.nextCursor);

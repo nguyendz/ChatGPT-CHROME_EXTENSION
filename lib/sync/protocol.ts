@@ -1,11 +1,41 @@
+import type { AssetKind } from '../asset-refs.ts';
+
+export type { AssetKind };
 export const HOST_NAME = 'com.chatgpt_backup.sync';
-export const HOST_VERSION = '0.6.0';
+export const HOST_VERSION = '0.7.0';
 export const PROTOCOL_VERSION = 1;
 export const MAX_HOST_TO_EXT_BYTES = 1_000_000;
 export const MAX_EXT_TO_HOST_BYTES = 64 * 1024 * 1024;
 export const ECHO_BYTES = 10 * 1024 * 1024;
 export const MAX_API_PROBE_REPORT_BYTES = 16 * 1024;
 export const API_DEBUG_CHUNK_CHARS = 16 * 1024;
+export const MAX_ASSET_BYTES = 5 * 1024 * 1024;
+export const MAX_RUN_ASSET_BYTES = 10 * 1024 * 1024;
+export const MAX_RUN_ASSETS = 50;
+export const ASSET_CHUNK_BYTES = 3 * 1024 * 1024;
+export const MAX_ASSET_CHUNK_CHARS = 4 * 1024 * 1024;
+export const MAX_ASSET_ATTEMPTS = 3;
+export const MAX_ASSET_HINT_CONVERSATIONS = 1000;
+
+export type AssetState = 'pending' | 'stored' | 'too-large' | 'unavailable' | 'failed';
+export type PendingAsset = {
+  conversationId: string; fileId: string; kind: AssetKind;
+  declaredSize: number | null; declaredMime: string | null; libraryFileId: string | null;
+};
+export type AssetStopReason = 'cancelled' | 'rate-limited' | 'unauthorized' | 'local-host';
+export type AssetRunSummary = {
+  stored: number; deduplicated: number; skippedTooLarge: number; unavailable: number;
+  failed: number; deferred: number; bytes: number; stopped?: AssetStopReason;
+};
+
+const assetSummaryKeys = ['stored', 'deduplicated', 'skippedTooLarge', 'unavailable', 'failed', 'deferred', 'bytes'] as const;
+
+export function isAssetRunSummary(value: unknown): value is AssetRunSummary {
+  return isRecord(value) &&
+    assetSummaryKeys.every(key => typeof value[key] === 'number' && Number.isSafeInteger(value[key]) && value[key] >= 0) &&
+    Object.keys(value).every(key => (assetSummaryKeys as readonly string[]).includes(key) || key === 'stopped') &&
+    (value.stopped === undefined || ['cancelled', 'rate-limited', 'unauthorized', 'local-host'].includes(value.stopped as string));
+}
 
 export type ApiDebugChunk = {
   runId: string; entryId: string; part: number; parts: number; data: string;
@@ -84,11 +114,24 @@ export type RequestPayloads = {
     sha256: string;
     manifestUpdateToken?: string | null;
   };
+  listPendingAssets: { runId: string; conversationIds: string[]; includeOthers: boolean; limit: number };
+  assetChunk: {
+    runId: string; uploadId: string; conversationId: string; fileId: string; seq: number; data: string;
+  };
+  assetCommit: {
+    runId: string; uploadId: string; conversationId: string; fileId: string;
+    sha256: string; size: number; mime: string;
+  };
+  assetOutcome: {
+    runId: string; conversationId: string; fileId: string;
+    state: 'too-large' | 'unavailable' | 'failed'; error?: string;
+  };
   endRun: {
     runId: string;
     cancelled: boolean;
     failures: Array<{ conversationId: string | null; error: string; retryable: boolean }>;
     projects?: ProjectSyncOutcome;
+    assets?: AssetRunSummary;
   };
 };
 export type AccountScope = { userId: string; workspaceId: string; email?: string };
@@ -100,7 +143,7 @@ export type HostStatus = {
   dbPath: string;
   schemaVersion: number;
   installId: string;
-  counts: { conversations: number; messages: number };
+  counts: { conversations: number; messages: number; assets?: number; assetBytes?: number; assetsPending?: number };
 };
 export type ResponsePayloads = {
   ping: { hostVersion: string; protocolVersion: number; pid: number; uptimeMs: number };
@@ -121,6 +164,10 @@ export type ResponsePayloads = {
     conversationId: string; status: UpsertStatus; messageCount: number;
     newMessageCount?: number; changeKind?: 'metadata-only';
   };
+  listPendingAssets: { items: PendingAsset[] };
+  assetChunk: { received: number };
+  assetCommit: { status: 'stored' | 'deduplicated' };
+  assetOutcome: { state: AssetState; attempts: number };
   endRun: {
     runId: string;
     status: 'completed' | 'failed' | 'cancelled';
@@ -167,7 +214,23 @@ export function isHostStatus(value: unknown): value is HostStatus {
     Array.isArray(value.capabilities) && value.capabilities.every(item => typeof item === 'string') &&
     typeof value.dbPath === 'string' && typeof value.schemaVersion === 'number' &&
     typeof value.installId === 'string' && isRecord(value.counts) &&
-    typeof value.counts.conversations === 'number' && typeof value.counts.messages === 'number';
+    typeof value.counts.conversations === 'number' && typeof value.counts.messages === 'number' &&
+    ['assets', 'assetBytes', 'assetsPending'].every(key => {
+      const count = (value.counts as Record<string, unknown>)[key];
+      return count === undefined || typeof count === 'number';
+    });
+}
+
+const ASSET_KIND_VALUES = ['attachment', 'image-upload', 'image-generated', 'code-output'];
+const ASSET_STATE_VALUES = ['pending', 'stored', 'too-large', 'unavailable', 'failed'];
+
+function isPendingAsset(value: unknown): value is PendingAsset {
+  return isRecord(value) && hasExactKeys(value, ['conversationId', 'fileId', 'kind', 'declaredSize', 'declaredMime', 'libraryFileId']) &&
+    typeof value.conversationId === 'string' && typeof value.fileId === 'string' &&
+    ASSET_KIND_VALUES.includes(value.kind as string) &&
+    (value.declaredSize === null || typeof value.declaredSize === 'number' && Number.isSafeInteger(value.declaredSize) && value.declaredSize >= 0) &&
+    (value.declaredMime === null || typeof value.declaredMime === 'string') &&
+    (value.libraryFileId === null || typeof value.libraryFileId === 'string');
 }
 
 function hasExactKeys(value: Record<string, unknown>, expected: string[]): boolean {
@@ -254,6 +317,15 @@ export function isResponsePayload<K extends keyof ResponsePayloads>(
       typeof item.conversationId === 'string' &&
       (item.updateTimeToken === null || typeof item.updateTimeToken === 'string')) &&
     value.listed === value.unchanged + value.changed.length;
+  if (type === 'listPendingAssets') return hasExactKeys(value, ['items']) && Array.isArray(value.items) &&
+    value.items.length <= MAX_RUN_ASSETS && value.items.every(isPendingAsset);
+  if (type === 'assetChunk') return hasExactKeys(value, ['received']) && typeof value.received === 'number' &&
+    Number.isSafeInteger(value.received) && value.received >= 0;
+  if (type === 'assetCommit') return hasExactKeys(value, ['status']) &&
+    (value.status === 'stored' || value.status === 'deduplicated');
+  if (type === 'assetOutcome') return hasExactKeys(value, ['state', 'attempts']) &&
+    ASSET_STATE_VALUES.includes(value.state as string) && typeof value.attempts === 'number' &&
+    Number.isSafeInteger(value.attempts) && value.attempts >= 0;
   if (type === 'upsertConversation') return typeof value.conversationId === 'string' &&
     (value.status === 'inserted' || value.status === 'updated' || value.status === 'noop') &&
     typeof value.messageCount === 'number' &&

@@ -1,12 +1,14 @@
 # Wave 4 — Project metadata and sync completeness
 
 **Status:** Wave 4A implemented and automatically verified; signed-in acceptance
-and endpoint workspace/continuation evidence remain pending. Wave 4B/4C are
-planned and disabled, not delivered.
+and endpoint workspace/continuation evidence remain pending. Wave 4B (W4.3,
+W4.1) and W4.6 are planned, not delivered. Archived-chat coverage (W4.2),
+scheduled sync (W4.4), and live sync (W4.5) are descoped; see
+[Scope decisions 2026-10-25](#scope-decisions-2026-10-25).
 
 This wave follows Wave 3. It starts with project/folder metadata and continues
-with the existing completeness work: project and archived conversation coverage,
-reconciliation, automatic/live sync, and account handling. It also extends the
+with the existing completeness work: project conversation coverage,
+reconciliation, and account handling. It also extends the
 existing Wave 6A viewer. See the
 [development waves](./local-sync-development-waves.md),
 [Wave 3 plan](./local-sync-wave-3-plan.md), and
@@ -31,10 +33,10 @@ project must update its local label even if all conversation update tokens match
 
 - **4A — Project metadata:** the detailed design below; independently verifiable
   delivery of actual folder names and saved project information.
-- **4B — Coverage and reconciliation:** verified project/archived enumeration
-  followed by safe missing-chat reconciliation.
-- **4C — Automation and account handling:** scheduled/live sync and explicit
-  profile/account selection, reusing the same writer locks and coverage rules.
+- **4B — Coverage and reconciliation:** verified project-chat coverage
+  followed by safe missing-chat reconciliation. Archived coverage is descoped.
+- **4C — Account handling:** explicit profile/account selection, reusing the
+  same writer locks. Scheduled/live sync is descoped.
 
 Completing 4A does not complete Wave 4. Existing task IDs W4.1–W4.6 are retained;
 the metadata work is W4.0, with detailed subtasks W4.0-P1–P6.
@@ -42,13 +44,28 @@ the metadata work is W4.0, with detailed subtasks W4.0-P1–P6.
 | Phase | Tasks | Delivery gate |
 |---|---|---|
 | 4A | W4.0 (P1–P6) | Saved account-scoped project names/information appear offline in the existing viewer. |
-| 4B | W4.2, W4.3, then W4.1 | Verified default/archived/project coverage supports safe manual full reconciliation. |
-| 4C | W4.6, W4.4, W4.5 | Explicit account selection and non-overlapping scheduled/live sync; weekly full runs require the 4B gate. |
+| 4B | W4.3, then W4.1 (W4.2 descoped) | Verified default/project coverage supports safe manual full reconciliation. |
+| 4C | W4.6 (W4.4, W4.5 descoped) | Explicit account selection; all sync remains user-started. |
 
-## Progress tracker 2026-10-23
+## Scope decisions 2026-10-25
+
+- **W4.2 archived-chat coverage — descoped.** Archived chats are not a current
+  use case. The default list returned no `is_archived: true` items in any
+  captured scan, so archived chats are not enumerated or synced. A chat
+  already saved locally keeps its saved copy if it is later archived; a later
+  reconciliation reports it as no longer listed (see W4.1).
+- **W4.4 scheduled sync and W4.5 live sync — descoped.** Unattended API traffic
+  risks rate-limiting or account blocking by the vendor. Every sync stays an
+  explicit, user-started, monitored run (Latest-10, All chats, or single chat).
+  No `chrome.alarms` permission, background triggers, or weekly full runs.
+- Re-scoping either item requires a new plan entry; nothing is implemented or
+  disabled behind a flag for them.
+
+## Progress tracker 2026-10-25
 
 **Overall: in progress.** 4A implementation and automated verification are
-complete; its signed-in acceptance is still open. 4B and 4C have not started.
+complete; its signed-in acceptance is still open. W4.3 has coverage evidence
+but no code changes; W4.1 and W4.6 have not started.
 “Done” below means the implementation/test gate is met, not that live endpoint
 coverage or signed-in acceptance has been proven. Status is based on the
 implementation checkpoint below and the acceptance evidence recorded here.
@@ -61,26 +78,40 @@ implementation checkpoint below and the acceptance evidence recorded here.
 | W4.0-P4 — sync integration/UI | Done | Metadata sync is integrated with Latest-10/All-chats, including no-op chat runs and separate project outcomes. | No known implementation task remains for 4A integration. |
 | W4.0-P5 — offline viewer | Done | Schema 3/4 read support, account-scoped names/details, zero-chat projects, refresh, and browser checks are implemented. | No known implementation task remains for 4A viewer delivery. |
 | W4.0-P6 — integration/acceptance | In progress | Automated local-sync/viewer tests, type-checks, builds, and isolated Chrome/native-host checks passed at the implementation checkpoint. | Signed-in acceptance remains: validate endpoint account/workspace context, actual labels/refresh/failure behavior, and record the still-unverified coverage limits. |
-| W4.2 — archived coverage | Not started | — | Capture and verify archive request parameters, account scope, pagination termination, visibility, and overlap behavior before implementation. |
-| W4.3 — project-chat coverage | Not started | — | Verify project nested-cursor requests and account scope; then enumerate full chats and deduplicate against other sources. 4A previews are not complete coverage. |
-| W4.1 — full reconciliation | Not started | — | Start only after W4.2 and W4.3 establish complete required-source coverage; implement guarded `markMissing` and default-retention behavior. |
+| W4.2 — archived coverage | Descoped | — | Not needed for current use; see scope decisions. |
+| W4.3 — project-chat coverage | Re-scoped; evidence gathered, manual check pending | Archive evidence (below) indicates the default `/conversations` list already includes project chats. No project-chat enumerator is planned unless the manual check fails. | (1) Manually count chats in each project with more than 5 chats in ChatGPT and compare with local counts. (2) Add a regression guard: an All-chats run fails coverage if any sidebar preview ID is absent from its default-list scan. |
+| W4.1 — full reconciliation | Not started | — | Start after W4.3 is closed; implement guarded `markMissing` and default-retention behavior over the default-list scope. |
 | W4.6 — account chooser/mismatch UX | Not started | — | 4A has defensive session/scope checks, but the explicit profile chooser and task-level account-switch UX/tests remain. |
-| W4.4 — scheduled sync | Not started | — | Add opt-in, non-overlapping scheduled incremental sync after W4.6. Enable weekly full runs only after W4.1 passes. |
-| W4.5 — live sync | Not started | — | Add debounced finished-reply/navigation sync through the single-chat path, sharing account selection and writer locks. |
+| W4.4 — scheduled sync | Descoped | — | Unattended sync risks vendor blocking; see scope decisions. |
+| W4.5 — live sync | Descoped | — | Unattended sync risks vendor blocking; see scope decisions. |
 
-**Next gates:** complete W4.0-P6 signed-in acceptance; verify W4.2 and W4.3
-coverage evidence (they can proceed independently); implement W4.1 only after
-both coverage gates pass. W4.6 can proceed independently; W4.4/W4.5 follow its
-account-selection and writer-lock requirements. Wave 4 is not complete until
-all three phase gates and the full-wave acceptance criteria below pass.
+**Next gates:** complete W4.0-P6 signed-in acceptance; close W4.3 with the
+manual count check and the preview regression guard; implement W4.1 only after
+that. W4.6 can proceed independently. Wave 4 is not complete until the 4A, 4B,
+and W4.6 gates and the full-wave acceptance criteria below pass.
+
+### W4.3 coverage evidence (2026-10-25)
+
+Read-only aggregate checks of the local archive and private API-debug log (no
+titles, names, or IDs recorded):
+
+- Five complete All-chats scans each listed the same 296 conversations, 85 of
+  them with a `g-p-` project `gizmo_id` across all 7 catalog projects. List
+  items carry `gizmo_id`, `is_archived`, and `workspace_id`.
+- All 31 sidebar previews, an independent project-side source, appeared in
+  the default list. All 85 saved project chats were seen in a default-list
+  response; none exist only through single-chat sync.
+- 5 projects have a non-null nested cursor (more than 5 chats); their local
+  counts are 10–23. Those counts come from the default list itself, so they do
+  not independently prove completeness; the manual count check closes this.
+- Not covered and accepted: archived chats (descoped), and chats that other
+  members create in shared projects (`owned_only=false`), which are untested.
+  The nested project-conversation request was never captured or followed.
 
 Phases describe deliveries, not a mandatory serial implementation order.
 W4.6 can start alongside 4A; 4A/4B use existing account identity/locking and
-must not wait for the new profile chooser. W4.4's incremental scheduler and
-W4.5 can follow W4.6 independently of 4B. W4.1 does not depend on W4.4:
-manual reconciliation is verified first, then the scheduler connects to it.
-The existing Wave 6A reader is a dependency only for 4A's viewer integration,
-not for remote coverage or automation.
+must not wait for the new profile chooser. The existing Wave 6A reader is a
+dependency only for 4A's viewer integration, not for remote coverage.
 
 ## Evidence from the supplied capture
 
@@ -145,10 +176,10 @@ The snorlax endpoint also does not establish names for custom-GPT groups.
 
 ### Outside phase 4A
 
-- Full project-chat enumeration, following nested conversation cursors, archived
-  coverage, and missing-conversation reconciliation. These belong to phase 4B:
-  W4.3 project coverage, W4.2 archived coverage, and W4.1 reconciliation.
-  Previews alone are never imported as complete conversations.
+- Project-chat coverage verification and missing-conversation reconciliation.
+  These belong to phase 4B: W4.3 project coverage and W4.1 reconciliation.
+  Archived coverage (W4.2) is descoped. Previews alone are never imported as
+  complete conversations.
 
 ### Outside Wave 4
 
@@ -162,8 +193,8 @@ The snorlax endpoint also does not establish names for custom-GPT groups.
 - Rendering project instructions as HTML or exposing owner emails, permissions,
   raw JSON, or instructions in the normal folder list.
 
-Manual current-chat sync retains its existing behavior; W4.5 adds an opt-in live
-trigger through that same path. A metadata-only action is not required for 4A.
+Manual current-chat sync retains its existing behavior; no live trigger is
+planned (W4.5 descoped). A metadata-only action is not required for 4A.
 
 ## Phase 4A data flow
 
@@ -429,75 +460,72 @@ above covers metadata only; later migrations, if needed, remain host-owned.
 ### Phase 4B coverage and reconciliation contract
 
 - Verify each source's request parameters, account/workspace context, and
-  terminal condition before claiming coverage. The archive parameter and nested
-  project-conversation continuation requests are not yet confirmed. Keep the
-  default list's established empty-page termination; do not impose that rule on
-  cursor-based sources or enable early-stop without ordering evidence.
-- Build an account-scoped union of default, archived, and project conversation
-  IDs before manifest comparison and detail selection. Deduplicate overlaps;
-  conflicting source metadata is reported/resolved from verified evidence,
-  never allowed to overwrite full conversation data with a preview.
+  terminal condition before claiming coverage. The required source is the
+  default list, which covers project chats per the W4.3 evidence; archived
+  coverage is descoped. Keep the default list's established empty-page
+  termination and do not enable early-stop without ordering evidence.
+- A project-chat source is added only if the W4.3 manual check shows the
+  default list misses project chats. If added, build an account-scoped union
+  before manifest comparison and detail selection, deduplicate overlaps, and
+  never overwrite full conversation data with a preview.
 - Latest-10 validation requests only the first page of ten conversation entries;
-  it does not enumerate the multi-source union or guarantee global recency.
-  All chats selects the completed union. Neither
+  it does not enumerate the full list or guarantee global recency.
+  All chats selects the complete default list. Neither
   scope is a full-reconciliation permission. Only an explicit full run can
-  evaluate absence, with all required sources successfully enumerated.
+  evaluate absence, with all required sources successfully enumerated and the
+  W4.3 preview regression guard passing.
 - Record source coverage/completion as a run-bound host-verifiable contract
   before accepting `markMissing`. A missing permission, unverified endpoint,
   source failure, cancellation, or incomplete result prevents reconciliation;
   a successful sidebar catalog alone is insufficient.
 - `remote_state='missing'` means absent from the verified scope, not proof of
-  remote deletion. Keep archived conversations archived, not missing merely
-  because they are absent from the default list. Reappearance clears missing
-  state through the normal upsert path.
+  remote deletion. With archived coverage descoped, a chat archived in ChatGPT
+  is also reported as missing; the UI must word this as "no longer in your chat
+  list (deleted or archived)". Reappearance clears missing state through the
+  normal upsert path.
 - Default behavior retains local data. Any removal setting remains off until
   explicitly enabled, applies only to eligible completed full runs, and cannot
   bypass coverage/account checks. Validate removal with disposable archives.
 
-### Phase 4C automation contract
+### Phase 4C account handling contract
 
-- Expose opt-in scheduled/live controls and explicit account/profile selection
-  in the existing local-sync UI; no unrelated Options-page redesign is required.
-  Automated runs must use the selected, verified account and an available
-  session, never silently follow a browser account switch.
-- Reuse pacing, retries, progress, run persistence, cancellation, and writer
-  locks across manual/scheduled/live triggers. Coalesce or defer overlapping
-  triggers instead of starting a second writer; record an actionable skipped or
-  failed outcome when identity/session/host availability prevents work.
-- Incremental scheduling is independent of full reconciliation. Connect a
-  weekly full-run trigger only after both W4.1 and W4.4 pass their own checks.
-  Live triggers use the existing single-chat path, not a sidebar/full scan.
+- Expose explicit account/profile selection in the existing local-sync UI; no
+  unrelated Options-page redesign is required. Runs must use the selected,
+  verified account and an available session, never silently follow a browser
+  account switch.
+- All runs are user-started and monitored. Do not add `chrome.alarms`,
+  background/scheduled triggers, finished-reply or navigation triggers, or
+  weekly full runs (W4.4/W4.5 descoped to avoid unattended API traffic).
 
 | ID / phase | Work / likely files | Dependencies | Done when |
 |---|---|---|---|
-| W4.2 / 4B | Verify archived-list parameters and paginate archived chats through the existing client/run engine. `lib/chatgpt-client.ts`, `lib/sync/all-chat.ts`, API findings. | Existing W3; live archive API evidence | Synthetic and signed-in checks establish archive visibility; overlapping IDs are deduplicated, archive state is preserved, and errors cannot look like an empty successful list. |
-| W4.3 / 4B | Verify project-conversation enumeration and nested cursor requests; fetch full details, deduplicate against default/archived lists, and preserve account scope. Client, project enumerator, run engine. | W4.0; live project paging/account evidence | A project larger than five chats is fully enumerated to its verified terminal condition; every selected ID uses the normal detail/parser/host path; preview-only snapshots never replace full raw chats. |
-| W4.1 / 4B | Manual full reconciliation with `markMissing`, `remote_state`, and an optional removal setting defaulting off. Host DB/protocol, run engine, settings. | W4.2 and W4.3 coverage gates | Only a successful complete account-scoped full scan can mark absence. Latest-10, failed/cancelled scans, and metadata-only absence cannot mark/delete chats. Tests prove default retention, reappearance, account isolation, and explicit opt-in removal behavior. |
+| W4.2 / 4B | **Descoped 2026-10-25.** Archived-chat coverage is not needed for current use. | — | — |
+| W4.3 / 4B | Confirm the default list covers project chats; add a preview regression guard to All-chats runs. A nested project-conversation enumerator is built only if the manual check fails. `lib/sync/all-chat.ts`, `lib/sync/projects.ts`. | W4.0; manual per-project count check | Manual counts for every project with more than 5 chats match local counts; an All-chats run reports incomplete coverage when any sidebar preview ID is missing from its default-list scan; preview-only snapshots never replace full raw chats. |
+| W4.1 / 4B | Manual full reconciliation with `markMissing`, `remote_state`, and an optional removal setting defaulting off. Host DB/protocol, run engine, settings. | W4.3 coverage gate | Only a successful complete account-scoped full scan can mark absence. Latest-10, failed/cancelled scans, and metadata-only absence cannot mark/delete chats. Missing wording covers deleted or archived chats. Tests prove default retention, reappearance, account isolation, and explicit opt-in removal behavior. |
 | W4.6 / 4C | Account-mismatch UX and profile chooser; preserve optional Edge registration. Background, popup, host-client/account checks. | Existing W3 account identity and locks | Switching accounts cannot store under the prior scope; unavailable/mismatched identities produce actionable errors; same remote IDs across scopes never overwrite another account's data. |
-| W4.4 / 4C | Add `chrome.alarms` scheduling and permission; run only with an available session and no active writer. Background, sync engine, settings/config. | Existing W3; W4.6 account selection; W4.1 only for the weekly full-run hook | Synthetic alarms prove no overlapping writers, no silent account choice, no prompting/login automation, and visible persisted outcomes. Weekly full scheduling is enabled only after W4.1 coverage/reconciliation gates pass. |
-| W4.5 / 4C | Detect finished replies/navigation and request debounced current-chat sync. Content script, background, single-chat engine. | Existing W2.5; W4.6 account selection | Duplicate events coalesce, navigation cancels obsolete work, partial replies are not treated as finished, and manual/scheduled/live work shares the same writer lock. |
+| W4.4 / 4C | **Descoped 2026-10-25.** No scheduled sync: unattended API traffic risks vendor blocking. | — | — |
+| W4.5 / 4C | **Descoped 2026-10-25.** No live sync: unattended API traffic risks vendor blocking. | — | — |
 
-W4.2 and W4.3 can be verified independently. Build the scheduler shell independently
-of reconciliation; connect its weekly full-run trigger only after complete-scan
-safety is proven. Do not resolve a lock conflict by bypassing account ownership.
+Do not resolve a lock conflict by bypassing account ownership.
 
 ### Full-wave acceptance
 
 - Phase 4A acceptance passes and saved project names remain usable offline.
-- Default, archived, and project list coverage have explicit live evidence.
-  Unknown/inaccessible coverage is reported rather than declared complete.
-- A full-run fixture combines overlapping sources, project pagination, archived
-  chats, and account switches; details are fetched once per selected ID and
-  source failures prevent absence reconciliation.
+- Default-list coverage of project chats has explicit evidence (W4.3).
+  Archived and shared-project coverage are reported as not covered rather than
+  declared complete.
+- A full-run fixture combines project chats in the default list, a missing
+  sidebar preview, and account switches; details are fetched once per selected
+  ID and coverage failures prevent absence reconciliation.
 - Missing/returning chats and opt-in removal are tested with disposable archives;
   no real archive deletion is required to validate the feature.
-- Manual, scheduled, and live triggers cannot overlap account writers; Stop,
-  session expiry, browser restart, and host disconnect retain committed data
-  and produce explicit run outcomes.
+- Manual runs cannot overlap account writers; Stop, session expiry, browser
+  restart, and host disconnect retain committed data and produce explicit run
+  outcomes.
 - Existing local-sync, viewer, type-check, production-build, and isolated Chrome
   checks pass for every affected surface. Record signed-in acceptance separately
   from synthetic test success.
 
-**Wave 4 exit:** project metadata, verified coverage/reconciliation, automation,
-and account handling pass their respective gates. Do not mark the wave complete
-after metadata delivery alone or retroactively close earlier live acceptance.
+**Wave 4 exit:** project metadata, verified coverage/reconciliation, and account
+handling pass their respective gates. Do not mark the wave complete after
+metadata delivery alone or retroactively close earlier live acceptance.

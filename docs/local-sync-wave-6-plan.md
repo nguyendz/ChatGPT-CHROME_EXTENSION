@@ -5,7 +5,9 @@ Companion to the [development waves](./local-sync-development-waves.md) and
 
 **Status:** Wave 6A implemented. Reader/API tests, isolated real-Chrome checks,
 and a read-only API smoke test of the current 10-chat archive pass. Final user
-visual acceptance remains pending. Waves 6B and 6C are not implemented.
+visual acceptance remains pending. Wave 6B is not implemented. Wave 6C Markdown
+export (single conversation and whole folder) is implemented ahead of 6B at the
+user's request; raw JSON export is not implemented.
 **Decisions confirmed:** 2026-10-20. Build a separate localhost browser app.
 Deliver browse/read first; add branch navigation, search, and export in later
 Wave 6 milestones. This document does not start a `.planning/` workflow.
@@ -308,7 +310,27 @@ During a self-contained browser check, stop the test server/browser afterward.
   through 559 active-branch messages of 566 stored rows, with no active-path
   warnings. No titles, message bodies, or account identifiers were logged.
 - User comparison of displayed chats with expected content remains the final
-  live acceptance step. Search/FTS, branch switching, and export remain deferred.
+  live acceptance step. Search/FTS and branch switching remain deferred.
+
+### Markdown export checkpoint (2026-10-25)
+
+- `local-app/viewer/markdown.ts`: pure serializer. One file per conversation:
+  YAML front matter (title, ID, updated/synced times, message counts), an
+  escaped title heading, then one `## Role · model` section per active-branch
+  message with its saved Markdown verbatim. Stored code messages use a fence
+  longer than any backtick run. Unsupported-content and warning notes are kept.
+  File names are portable (`<title> (<first 8 ID chars>).md`, reserved/illegal
+  characters removed, 80-character title cap).
+- `GET /api/conversations/:id/markdown?accountId=` (same token/origin checks)
+  reads the full active branch in one snapshot, unpaginated, up to 64 MiB.
+- UI: **Export Markdown** on an open conversation downloads one `.md` file.
+  **Export folder to Markdown** writes one `.md` per conversation in the
+  selected sidebar folder into a `<folder name>` subdirectory of a directory the
+  user picks (File System Access API). Browsers without it receive a store-only
+  `<folder name>.zip` (`local-app/viewer/zip.ts`). Progress, cancel, and
+  per-conversation read failures are reported; the DB is never modified.
+- Only the active branch is exported; alternate branches are counted in the
+  file. Raw JSON export remains a later 6C item.
 
 ### 6A live acceptance checklist
 
