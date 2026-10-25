@@ -47,6 +47,8 @@ export type AllChatSyncResult = {
   failurePhase?: 'projects' | 'listing' | 'selection' | 'syncing';
   projects?: ProjectSyncOutcome;
   assets?: AssetRunSummary;
+  /** Files still not downloaded at the start of a run that did not include files. */
+  assetsPending?: number;
 };
 
 export type AllChatSyncDependencies = {
@@ -213,6 +215,7 @@ export async function syncAllConversations(
   let failurePhase: AllChatSyncResult['failurePhase'];
   let projects: ProjectSyncOutcome = { status: 'cancelled', category: 'cancelled' };
   let assetSummary: AssetRunSummary | undefined;
+  let pendingAssets = 0;
   const changedIds: string[] = [];
 
   function report(phase: AllChatSyncProgress['phase']) {
@@ -237,6 +240,7 @@ export async function syncAllConversations(
       (!hostStatus.capabilities.includes('asset-sync') || hostStatus.schemaVersion < 5)) {
       throw new Error('Update the local sync host before downloading images and files (asset-sync, schema 5 required).');
     }
+    if (!dependencies.includeAssets && hostStatus.counts?.assetsPending) pendingAssets = hostStatus.counts.assetsPending;
     if (signal?.aborted) {
       return {
         runId, status: 'cancelled',
@@ -434,6 +438,7 @@ export async function syncAllConversations(
       status: summary.status,
       projects,
       ...(assetSummary ? { assets: assetSummary } : {}),
+      ...(pendingAssets ? { assetsPending: pendingAssets } : {}),
       counts: {
         listed: progress.listed, selected: selectedCount,
         new: summary.counts.new, newMessages: progress.newMessages,

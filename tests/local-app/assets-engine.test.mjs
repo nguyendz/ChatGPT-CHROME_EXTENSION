@@ -261,10 +261,21 @@ test('all-chat sync downloads files after chats and reports the summary to the h
   const off = await syncAllConversations(scopeA, 'secret-token', {
     client, maxConversations: 10,
     fetchProjects: async () => ({ items: [], cursor: null }), verifyScope: async () => {},
-    fetchPage: async () => ({ total: 1, items: [{ id: 'chat-with-files', updateTimeToken: 'n:1' }] }),
-    fetchRaw: async () => raw,
+    fetchPage: async () => ({ total: 1, items: [{ id: 'chat-with-files', updateTimeToken: 'n:2' }] }),
+    fetchRaw: async () => { const next = assetRaw('chat-with-files'); next.update_time = 700; return next; },
   });
   assert.equal(off.assets, undefined);
+  assert.equal(off.assetsPending, undefined, 'nothing is pending after every file was downloaded');
+
+  const { db: freshDb, client: freshClient } = host(t);
+  saveChat(freshDb);
+  const hint = await syncAllConversations(scopeA, 'secret-token', {
+    client: freshClient, maxConversations: 10,
+    fetchProjects: async () => ({ items: [], cursor: null }), verifyScope: async () => {},
+    fetchPage: async () => ({ total: 0, items: [] }),
+  });
+  assert.equal(hint.assets, undefined);
+  assert.equal(hint.assetsPending, 7, 'a run without files reports how many are waiting');
 });
 
 test('asset sync is refused when the host lacks the capability and chats keep working without it', async t => {

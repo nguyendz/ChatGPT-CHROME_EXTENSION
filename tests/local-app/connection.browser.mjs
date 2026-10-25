@@ -155,7 +155,15 @@ try {
   }})`);
   await until('document.body.innerText.includes("Project information: failed (pagination-unverified)")');
   assert.equal(await evaluate('document.body.innerText.includes("All-chat sync finished with failures")'), true);
-  assert.equal(await evaluate('document.body.innerText.includes("Files:")'), false, 'No file summary when files were not requested');
+  assert.equal(await evaluate('document.body.innerText.includes("Files: 0 saved (0 KB), 0 waiting to download")'), true, 'Connection details report file counts');
+  await evaluate(`globalThis.syncProgressPort = globalThis.makeSyncProgressPort();
+    [...document.querySelectorAll('button')].find(b => b.textContent === 'Sync latest 10 chats').click()`);
+  await until('!![...document.querySelectorAll("button")].find(b => b.textContent === "Stop sync")');
+  await evaluate(`globalThis.syncProgressPort.emit({type:'complete',result:{
+    runId:'pending-hint',status:'completed',projects:{status:'completed',count:1},assetsPending:28,
+    counts:{listed:1,selected:1,new:0,newMessages:0,updated:0,unchanged:1,failed:0}
+  }})`);
+  await until('document.body.innerText.includes("28 files (images and attachments) used by saved chats are not downloaded yet; tick")');
   await evaluate(`document.querySelector('input[type=checkbox]').click()`);
   assert.equal(await evaluate('localStorage.getItem("localSync.includeAssets")'), '1');
   await evaluate(`globalThis.syncProgressPort = globalThis.makeSyncProgressPort();

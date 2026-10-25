@@ -14,6 +14,7 @@ async function diagnostic<T>(message: string, extra: Record<string, unknown> = {
 const INCLUDE_ASSETS_KEY = 'localSync.includeAssets';
 
 function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 KB';
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
@@ -73,6 +74,7 @@ function isRunResult(value: unknown): value is AllChatSyncResult {
     isCount(value.counts.failed) && (value.error === undefined || typeof value.error === 'string') &&
     (value.projects === undefined || isProjectSyncOutcome(value.projects)) &&
     (value.assets === undefined || isAssetRunSummary(value.assets)) &&
+    (value.assetsPending === undefined || isCount(value.assetsPending)) &&
     (value.failurePhase === undefined ||
       value.failurePhase === 'projects' || value.failurePhase === 'listing' ||
       value.failurePhase === 'selection' || value.failurePhase === 'syncing');
@@ -214,7 +216,8 @@ export function LocalSyncPanel() {
         const logHint = raw.result.status === 'failed'
           ? ' See sanitized SYNC_RUN_FAILURE details in %LOCALAPPDATA%\\ChatGPTBackup\\logs\\host.log.'
           : '';
-        const fileHint = assetSummaryText(raw.result.assets);
+        const fileHint = assetSummaryText(raw.result.assets) ||
+          (raw.result.assetsPending ? ` ${raw.result.assetsPending} ${raw.result.assetsPending === 1 ? 'file' : 'files'} (images and attachments) used by saved chats ${raw.result.assetsPending === 1 ? 'is' : 'are'} not downloaded yet; tick "Include images & files" and sync again to download ${raw.result.assetsPending === 1 ? 'it' : 'them'}.` : '');
         setFeedback(`All-chat sync ${outcome}: ${selectedSummary}; ${newChatSummary}, ${newMessageSummary}, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.failed} failed.${projectHint}${fileHint}${retryHint}${errorHint}${logHint}`);
         port.disconnect();
         return;
@@ -375,6 +378,9 @@ export function LocalSyncPanel() {
         {status?.host && <>
           <p>Host {status.host.hostVersion} / Protocol {status.host.protocolRange.join('-')} / Schema {status.host.schemaVersion}</p>
           <p>Round trip: {status.rttMs} ms</p>
+          {status.host.counts.assets !== undefined && <p>
+            Files: {status.host.counts.assets} saved ({formatBytes(status.host.counts.assetBytes ?? 0)}), {status.host.counts.assetsPending ?? 0} waiting to download
+          </p>}
           <p className="break-all">Database: {status.host.dbPath}</p>
           <Button size="sm" variant="outline" onClick={copyPath}>Copy DB path</Button>
         </>}
