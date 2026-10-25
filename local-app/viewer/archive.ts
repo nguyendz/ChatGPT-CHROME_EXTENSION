@@ -367,21 +367,22 @@ export class Archive {
     });
   }
 
-  /** Full saved active branch as one Markdown document, read from a single consistent snapshot. */
-  exportMarkdown(accountId: string, id: string): MarkdownExport {
+  /** Saved active branch as one Markdown document (optionally only the user's messages), from a single consistent snapshot. */
+  exportMarkdown(accountId: string, id: string, userOnly = false): MarkdownExport {
     return this.snapshot(() => {
       this.checkAccount(accountId);
       const { detail, path } = this.readConversation(accountId, id);
       const messages = this.readMessages(accountId, id, path);
+      const included = userOnly ? messages.filter(message => message.role === 'user') : messages;
       const files = new Map<string, ExportAsset>();
-      for (const asset of messages.flatMap(message => message.assets)) {
+      for (const asset of included.flatMap(message => message.assets)) {
         if (asset.state === 'stored' && asset.size !== null && !files.has(asset.fileId)) {
           files.set(asset.fileId, { fileId: asset.fileId, fileName: assetFileName(asset.fileId, asset.mime), mime: asset.mime, size: asset.size });
         }
       }
       return {
-        id, fileName: markdownFileName(detail.title, id),
-        markdown: conversationMarkdown(detail, messages, files), assets: [...files.values()],
+        id, fileName: markdownFileName(detail.title, id, userOnly),
+        markdown: conversationMarkdown(detail, messages, files, { userOnly }), assets: [...files.values()],
       };
     });
   }

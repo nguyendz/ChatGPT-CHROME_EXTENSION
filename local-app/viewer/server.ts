@@ -101,7 +101,11 @@ export async function startViewer(options: { directory?: string; uiDirectory?: s
         }
         if (!/^[a-zA-Z0-9-]{1,128}$/.test(id)) throw new ViewerError(400, 'INVALID_INPUT', 'Invalid conversation ID.');
         if (!match[2]) return json(200, archive.detail(account, id));
-        if (match[2] === '/markdown') return json(200, archive.exportMarkdown(account, id), MAX_EXPORT_BYTES);
+        if (match[2] === '/markdown') {
+          const roles = url.searchParams.get('roles') ?? 'all';
+          if (roles !== 'all' && roles !== 'user') throw new ViewerError(400, 'INVALID_INPUT', 'roles must be "all" or "user".');
+          return json(200, archive.exportMarkdown(account, id, roles === 'user'), MAX_EXPORT_BYTES);
+        }
         const revision = url.searchParams.get('revision');
         if (!revision || !/^[a-f0-9]{64}$/.test(revision)) throw new ViewerError(400, 'INVALID_INPUT', 'A valid conversation revision is required.');
         return json(200, archive.messages(account, id, revision,

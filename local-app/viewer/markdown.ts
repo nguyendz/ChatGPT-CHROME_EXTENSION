@@ -30,8 +30,8 @@ export function safeFileName(value: string | null | undefined, fallback = 'Untit
   return name;
 }
 
-export function markdownFileName(title: string | null, id: string): string {
-  return `${safeFileName(title)} (${safeFileName(id.slice(0, 8), 'chat')}).md`;
+export function markdownFileName(title: string | null, id: string, userOnly = false): string {
+  return `${safeFileName(title)} (${safeFileName(id.slice(0, 8), 'chat')})${userOnly ? ' - user messages' : ''}.md`;
 }
 
 function isoTime(value: number | string | null): string | null {
@@ -57,8 +57,10 @@ function roleLabel(role: string): string {
 
 /** Serializes the saved active branch of one conversation. Message text is exported verbatim. */
 export function conversationMarkdown(
-  detail: ConversationDetail, messages: ViewerMessage[], files: ReadonlyMap<string, ExportAsset> = new Map(),
+  detail: ConversationDetail, allMessages: ViewerMessage[], files: ReadonlyMap<string, ExportAsset> = new Map(),
+  options: { userOnly?: boolean } = {},
 ): string {
+  const messages = options.userOnly ? allMessages.filter(message => message.role === 'user') : allMessages;
   const title = detail.title?.trim() || 'Untitled conversation';
   const lines = [
     '---',
@@ -67,12 +69,17 @@ export function conversationMarkdown(
     `updated: ${JSON.stringify(isoTime(detail.updateTime))}`,
     `last_synced: ${JSON.stringify(isoTime(detail.lastSyncedAt) ?? detail.lastSyncedAt)}`,
     `active_messages: ${messages.length}`,
+    ...(options.userOnly ? ['included_roles: "user"', `omitted_active_messages: ${allMessages.length - messages.length}`] : []),
     `other_stored_messages: ${detail.otherMessageCount}`,
     '---',
     '',
     `# ${escapeInline(title)}`,
     '',
   ];
+  if (options.userOnly) {
+    const omitted = allMessages.length - messages.length;
+    lines.push(`> User messages only. ${omitted} other message${omitted === 1 ? '' : 's'} on the active branch ${omitted === 1 ? 'is' : 'are'} not included.`, '');
+  }
   if (detail.otherMessageCount > 0) {
     lines.push(`> Active branch only. ${detail.otherMessageCount} other stored message${detail.otherMessageCount === 1 ? ' is' : 's are'} not included.`, '');
   }
@@ -99,6 +106,8 @@ export function conversationMarkdown(
       }
     }
   }
-  if (!messages.length) lines.push('*No messages on a valid saved active branch.*', '');
+  if (!messages.length) {
+    lines.push(options.userOnly && allMessages.length ? '*No user messages on the saved active branch.*' : '*No messages on a valid saved active branch.*', '');
+  }
   return lines.join('\n');
 }

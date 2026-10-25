@@ -97,8 +97,8 @@ function uniqueName(name: string, used: Set<string>): string {
   return candidate;
 }
 
-function markdownUrl(accountId: string, id: string): string {
-  return `/api/conversations/${encodeURIComponent(id)}/markdown?accountId=${encodeURIComponent(accountId)}`;
+function markdownUrl(accountId: string, id: string, userOnly: boolean): string {
+  return `/api/conversations/${encodeURIComponent(id)}/markdown?accountId=${encodeURIComponent(accountId)}${userOnly ? '&roles=user' : ''}`;
 }
 
 function assetUrl(accountId: string, conversationId: string, fileId: string): string {
@@ -152,6 +152,7 @@ function App() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [singleExport, setSingleExport] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [folderExport, setFolderExport] = useState<FolderExport | null>(null);
+  const [userOnly, setUserOnly] = useState(false);
   const folderController = useRef<AbortController | null>(null);
   const transcript = useRef<HTMLElement>(null);
   const detail = detailState?.refresh === refresh && detailState.detail.id === selected ? detailState.detail : null;
@@ -233,7 +234,7 @@ function App() {
     const request = new AbortController();
     setSingleExport({ busy: true, error: null });
     try {
-      const result = await api(markdownUrl(accountId, id), isMarkdownExport, request.signal);
+      const result = await api(markdownUrl(accountId, id, userOnly), isMarkdownExport, request.signal);
       if (result.assets.length) {
         const files = await readExportAssets(accountId, id, result.assets, request.signal);
         const entries: ZipEntry[] = [{ name: result.fileName, data: new TextEncoder().encode(result.markdown) }];
@@ -252,7 +253,8 @@ function App() {
     const group = groups.find(item => item.id === groupId);
     if (!group || !accountId || folderExport?.busy) return;
     const account = accountId;
-    const folderName = safeFileName(group.label, 'Conversations');
+    const onlyUser = userOnly;
+    const folderName = safeFileName(`${group.label}${onlyUser ? ' - user messages' : ''}`, 'Conversations');
     let directory: FileSystemDirectoryHandle | null = null;
     if (window.showDirectoryPicker) {
       try {
@@ -290,7 +292,7 @@ function App() {
         let result;
         let files: Array<{ fileName: string; blob: Blob }> = [];
         try {
-          result = await api(markdownUrl(account, id), isMarkdownExport, request.signal);
+          result = await api(markdownUrl(account, id, onlyUser), isMarkdownExport, request.signal);
           files = await readExportAssets(account, id, result.assets, request.signal, writtenAssets);
         } catch (error) {
           if (request.signal.aborted) throw error;
@@ -373,6 +375,13 @@ function App() {
               </option>)}
             </select>
             <div className="export-row">
+              <label className="export-option">
+                <input type="checkbox" checked={userOnly} disabled={folderExport?.busy || singleExport.busy}
+                  onChange={event => setUserOnly(event.currentTarget.checked)} />
+                User messages only
+              </label>
+            </div>
+            <div className="export-row">
               {folderExport?.busy
                 ? <>
                   <span role="status">Exporting {folderExport.done} / {folderExport.total}...</span>
@@ -426,7 +435,7 @@ function App() {
               <div className="export-row">
                 <button type="button" className="export-conversation" disabled={singleExport.busy}
                   onClick={() => void exportConversation(detail.id)}>
-                  {singleExport.busy ? 'Exporting...' : 'Export Markdown'}
+                  {singleExport.busy ? 'Exporting...' : userOnly ? 'Export Markdown (user messages only)' : 'Export Markdown'}
                 </button>
               </div>
               {singleExport.error && <p className="banner error" role="alert">{singleExport.error}</p>}

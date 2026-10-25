@@ -96,6 +96,55 @@ test('Markdown export links stored files and notes the rest', t => {
   assert.equal(assetFileName('file-x', null), 'file-x.bin');
 });
 
+test('user-only export keeps just the user messages, their files, and says so', t => {
+  const { archive, accountA } = fixture(t);
+  const all = archive.exportMarkdown(accountA, 'asset-chat');
+  const only = archive.exportMarkdown(accountA, 'asset-chat', true);
+  assert.equal(only.fileName, all.fileName.replace(/\.md$/, ' - user messages.md'));
+  assert.equal(isMarkdownExport(only), true);
+  assert.deepEqual([...only.markdown.matchAll(/^## (.+)$/gm)].map(match => match[1]), ['User']);
+  assert.ok(only.markdown.includes('included_roles: "user"'));
+  assert.ok(only.markdown.includes('active_messages: 1\n'));
+  assert.ok(only.markdown.includes('omitted_active_messages: 2'));
+  assert.ok(only.markdown.includes('> User messages only. 2 other messages on the active branch are not included.'));
+  assert.ok(only.markdown.includes('Describe these files'));
+  assert.equal(only.markdown.includes('done'), false, 'tool output is omitted');
+  assert.equal(only.markdown.includes(ids.generated), false, 'assistant-generated files are omitted');
+  assert.deepEqual(only.assets.map(asset => asset.fileId), [ids.upload, ids.doc, ids.lonely]);
+  assert.deepEqual(all.assets.map(asset => asset.fileId), only.assets.map(asset => asset.fileId));
+  assert.equal(all.markdown.includes('included_roles'), false, 'default export is unchanged');
+});
+
+test('user-only export of a chat without user messages says so', t => {
+  const path = mkdtempSync(join(tmpdir(), 'chatgpt-viewer-assistant-only-'));
+  const raw = assetRaw('assistant-only');
+  delete raw.mapping.user;
+  raw.mapping.assistant.parent = 'root';
+  const account = writeConversation(path, raw);
+  const archive = new Archive(path);
+  t.after(() => { archive.close(); rmSync(path, { recursive: true, force: true }); });
+  const only = archive.exportMarkdown(account, 'assistant-only', true);
+  assert.ok(only.markdown.includes('*No user messages on the saved active branch.*'));
+  assert.deepEqual(only.assets, []);
+});
+
+test('export route accepts roles=user and rejects other values', async t => {
+  const path = mkdtempSync(join(tmpdir(), 'chatgpt-viewer-roles-'));
+  const accountA = seed(path);
+  const ui = join(path, 'ui');
+  mkdirSync(ui);
+  writeFileSync(join(ui, 'index.html'), '<!doctype html><title>Synthetic viewer</title>');
+  const viewer = await startViewer({ directory: path, uiDirectory: ui });
+  t.after(async () => { await viewer.close(); rmSync(path, { recursive: true, force: true }); });
+  const headers = { Authorization: `Bearer ${viewer.token}` };
+  const url = roles => `${viewer.origin}/api/conversations/asset-chat/markdown?accountId=${encodeURIComponent(accountA)}${roles}`;
+  const body = await (await fetch(url('&roles=user'), { headers })).json();
+  assert.match(body.fileName, / - user messages\.md$/);
+  assert.equal((await fetch(url('&roles=all'), { headers })).status, 200);
+  assert.equal((await fetch(url('&roles=assistant'), { headers })).status, 400);
+  assert.equal((await fetch(url('&roles=user&roles=all'), { headers })).status, 400);
+});
+
 test('conversations without stored files export exactly as before', t => {
   const path = mkdtempSync(join(tmpdir(), 'chatgpt-viewer-noassets-'));
   const account = writeConversation(path, assetRaw('plain-assets'));

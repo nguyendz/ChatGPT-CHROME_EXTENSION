@@ -120,7 +120,11 @@ to stop the viewer.
   and Edge ask for a destination directory and write into a subfolder named
   after the viewer folder; other browsers download a `.zip` of the same files.
   Files contain YAML front matter, role/model headings, and the saved message
-  Markdown verbatim. Exporting re-reads saved data and never changes the DB.
+  Markdown verbatim. Tick **User messages only** (above the folder button) to
+  export just your own messages, with their uploaded files, for either export;
+  the front matter records `included_roles: "user"`, file names end in
+  ` - user messages`, and a folder export goes to a `<folder> - user messages`
+  subfolder or `.zip`. Exporting re-reads saved data and never changes the DB.
   Re-exporting into the same directory overwrites files with the same name.
 
 The viewer supports archive schemas 3, 4, and 5; older schemas retain provisional labels

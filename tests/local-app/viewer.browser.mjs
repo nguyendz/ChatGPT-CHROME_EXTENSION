@@ -345,6 +345,24 @@ try {
   assert.deepEqual(folderZip.get(`No project marker/assets/${assetIds.upload}.png`), png);
   assert.equal(await evaluate('!!globalThis.viewerInjected'), false);
 
+  await evaluate(`document.querySelector('.export-option input').click()`);
+  await evaluate(`document.querySelector('.chat-item').click()`);
+  await until('!!document.querySelector(".export-conversation")');
+  assert.equal(await evaluate('document.querySelector(".export-conversation").textContent'), 'Export Markdown (user messages only)');
+  await evaluate(`document.querySelector('.export-folder').click()`);
+  await until('/Exported (\\d+) of \\1 conversations to No project marker - user messages\\.zip/.test(document.querySelector(".export-message")?.textContent ?? "")');
+  const userZip = readZip(await downloaded('No project marker - user messages.zip'));
+  const userDocs = [...userZip.entries()].filter(([name]) => name.endsWith('.md') && !name.includes('/assets/'));
+  assert.ok(userDocs.length > 1);
+  for (const [name, data] of userDocs) {
+    const text = data.toString('utf8');
+    assert.ok(name.startsWith('No project marker - user messages/'), name);
+    assert.ok(/ - user messages\.md$/.test(name), name);
+    assert.ok(text.includes('included_roles: "user"'), name);
+    assert.deepEqual([...text.matchAll(/^## (.+)$/gm)].map(match => match[1]).filter(role => role !== 'User'), [], name);
+  }
+  await evaluate(`document.querySelector('.export-option input').click()`);
+  assert.equal(await evaluate('document.querySelector(".export-conversation").textContent'), 'Export Markdown');
   await evaluate(`document.querySelector('#account').value = ${JSON.stringify(accountB)};
     document.querySelector('#account').dispatchEvent(new Event('change', { bubbles: true }));`);
   await until('[...document.querySelectorAll("#folder-select option")].some(option => option.textContent.includes("Other account project"))');
